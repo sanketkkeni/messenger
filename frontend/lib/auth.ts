@@ -1,4 +1,4 @@
-import { CognitoIdentityProviderClient, SignUpCommand, SignInCommand, GetUserCommand, InitiateAuthCommand, SignOutCommand } from '@aws-sdk/client-cognito-identity-provider';
+import { CognitoIdentityProviderClient, SignUpCommand, SignInCommand, GetUserCommand, InitiateAuthCommand, SignOutCommand, ConfirmSignUpCommand } from '@aws-sdk/client-cognito-identity-provider';
 
 const REGION = process.env.NEXT_PUBLIC_AWS_REGION || 'us-east-1';
 const USER_POOL_ID = process.env.NEXT_PUBLIC_USER_POOL_ID || '';
@@ -35,7 +35,6 @@ export async function signUp(email: string, password: string, username?: string)
 }
 
 export async function confirmSignUp(email: string, confirmationCode: string): Promise<boolean> {
-  const { ConfirmSignUpCommand } = await import('@aws-sdk/client-cognito-identity-provider');
   const command = new ConfirmSignUpCommand({
     ClientId: CLIENT_ID,
     Username: email,

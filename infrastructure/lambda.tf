@@ -13,9 +13,9 @@ resource "aws_lambda_function" "authorizer" {
   # Environment variables
   environment {
     variables = {
-      USER_POOL_ID    = aws_cognito_user_pool.family_messenger.id
-      CLIENT_ID       = aws_cognito_user_pool_client.family_messenger_client.id
-      LOG_LEVEL       = "INFO"
+      USER_POOL_ID           = aws_cognito_user_pool.family_messenger.id
+      USER_POOL_APP_CLIENT_ID = aws_cognito_user_pool_client.family_messenger_client.id
+      LOG_LEVEL             = "INFO"
     }
   }
   

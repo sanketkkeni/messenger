@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
-import { MessageSquare, Loader2 } from 'lucide-react';
+import { MessageSquare, Loader2, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Signup() {
   const router = useRouter();
   const { signUp } = useAuth();
+  const [step, setStep] = useState<'form' | 'success'>('form');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -31,13 +32,63 @@ export default function Signup() {
 
     try {
       await signUp(email, password);
-      router.push('/login');
+      setStep('success');
     } catch (err: any) {
       setError(err.message || 'Sign up failed');
     } finally {
       setLoading(false);
     }
   };
+
+  if (step === 'success') {
+    return (
+      <div className="min-h-screen bg-dark-900 text-white flex flex-col">
+        {/* Header */}
+        <header className="p-6">
+          <nav className="flex justify-between items-center max-w-6xl mx-auto">
+            <Link href="/" className="flex items-center gap-2">
+              <MessageSquare className="h-8 w-8 text-primary-500" />
+              <span className="text-xl font-bold">Family Messenger</span>
+            </Link>
+          </nav>
+        </header>
+
+        {/* Success / Confirmation */}
+        <main className="flex-1 flex items-center justify-center px-6">
+          <div className="w-full max-w-md">
+            <div className="glass-dark p-8 rounded-2xl text-center">
+              <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="h-10 w-10 text-green-400" />
+              </div>
+              <h1 className="text-3xl font-bold mb-2">Check Your Email</h1>
+              <p className="text-gray-400 mb-6">
+                We&apos;ve sent a verification code to<br />
+                <span className="text-white font-medium">{email}</span>
+              </p>
+              <p className="text-gray-400 text-sm mb-8">
+                Enter the code to verify your account.
+              </p>
+              <button
+                onClick={() => router.push(`/confirm?email=${encodeURIComponent(email)}`)}
+                className="w-full py-3 bg-primary-600 hover:bg-primary-700 rounded-lg font-semibold transition-colors"
+              >
+                Enter Verification Code
+              </button>
+              <p className="mt-6 text-gray-500 text-sm">
+                Didn&apos;t receive the code?{' '}
+                <button
+                  onClick={() => setStep('form')}
+                  className="text-primary-400 hover:text-primary-300"
+                >
+                  Try again
+                </button>
+              </p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-dark-900 text-white flex flex-col">

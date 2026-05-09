@@ -42,3 +42,23 @@
 - backend/ - Python Lambda functions and zip files
 - frontend/ - Next.js application
 - Root level: README.md, PLAN.md, AGENTS.md
+
+## Frontend Testing
+- Use Jest + React Testing Library for unit/integration tests
+- Test config: `jest.config.js`, `jest.setup.js`
+- Test files location: `frontend/__tests__/`
+- Test commands:
+  - `npm test` - Run all tests
+  - `npm run test:watch` - Watch mode
+  - `npm run test:coverage` - With coverage report
+- Always mock external dependencies (auth context, router, AWS SDK)
+- Use `waitFor` from testing-library for async operations
+- Coverage target: aim for 70%+ on critical components
+
+## Frontend Code Quality
+- Use Next.js 14 with App Router conventions
+- Use `router.query` instead of `useSearchParams()` to avoid Suspense issues
+- Import ConfirmSignUpCommand directly (not dynamically)
+- Pin dependency versions in package.json (avoid "latest")
+- Run `npm install` in frontend directory for dependencies
+- Add NODE_PATH or use `C:\Program Files\nodejs` if PATH issues arise

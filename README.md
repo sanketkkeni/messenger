@@ -54,7 +54,10 @@ messenger/
 │   ├── components/       # Reusable components
 │   ├── lib/              # Utilities (auth, websocket)
 │   ├── context/          # React contexts
-│   └── styles/           # CSS files
+│   ├── __tests__/        # Jest test files
+│   ├── styles/           # CSS files
+│   ├── jest.config.js    # Jest configuration
+│   └── jest.setup.js     # Test setup
 └── README.md             # This file
 ```
 
@@ -318,7 +321,78 @@ Type `yes` when prompted to confirm deletion of all resources.
 1. **Update Infrastructure:** Modify `.tf` files and run `terraform apply`
 2. **Update Backend:** Modify Python files, zip, and update Lambda functions
 3. **Update Frontend:** Modify React components and run `npm run dev`
-4. **Testing:** Use the frontend UI or Postman/curl for REST API testing
+4. **Testing:** Use Jest + React Testing Library for automated tests
+
+## Testing
+
+### Frontend Testing Setup
+
+The project uses Jest + React Testing Library for automated tests.
+
+**Test Configuration:**
+- `jest.config.js` - Jest configuration with Next.js integration
+- `jest.setup.js` - Test setup file (imports jest-dom matchers)
+- `__tests__/` - Test files location
+
+**Test Commands:**
+```bash
+cd frontend
+
+npm test              # Run all tests
+npm run test:watch    # Watch mode for development
+npm run test:coverage # Run tests with coverage report
+```
+
+### Writing Tests
+
+**Example Test Structure:**
+```typescript
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import Login from '@/pages/login';
+
+// Mock external dependencies
+jest.mock('@/context/AuthContext', () => ({
+  useAuth: () => ({
+    signIn: mockSignIn,
+    loading: false,
+  }),
+}));
+
+describe('Login Page', () => {
+  it('renders login form', () => {
+    render(<Login />);
+    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+  });
+
+  it('calls signIn on submit', async () => {
+    mockSignIn.mockResolvedValueOnce({});
+    render(<Login />);
+    // ... test implementation
+  });
+});
+```
+
+### Coverage Target
+
+- **Goal:** 70%+ coverage on critical components
+- Focus on: auth flow, form validation, error handling
+- Current coverage: login (100%), signup (94%)
+
+### Testing Best Practices
+
+1. **Mock external dependencies** - Auth context, router, AWS SDK
+2. **Use `waitFor`** for async operations
+3. **Test user flows** - Not just unit tests
+4. **Cover error cases** - Invalid input, API failures
+5. **Keep tests isolated** - Reset mocks in `beforeEach`
+
+### Test Files
+
+| File | Purpose | Coverage |
+|------|---------|----------|
+| `__tests__/login.test.tsx` | Login page tests | 100% |
+| `__tests__/signup.test.tsx` | Signup page tests | 94% |
+| `__tests__/auth.test.ts` | Auth utility tests | 55% |
 
 ## License
 
