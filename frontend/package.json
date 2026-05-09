@@ -1,0 +1,29 @@
+{
+  "name": "family-messenger-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "aws-amplify": "^6.0.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.400.0",
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.400.0",
+    "lucide-react": "^0.300.0"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.3.5",
+    "typescript": "latest"
+  }
+}
