@@ -8,7 +8,7 @@ resource "aws_lambda_function" "authorizer" {
   memory_size   = var.lambda_memory_size
   
   # Package the Lambda function from local directory
-  filename = "${path.module}/../backend/authorizer.zip"
+  filename = "${path.module}/authorizer.zip"
   
   # Environment variables
   environment {
@@ -35,7 +35,7 @@ resource "aws_lambda_function" "connect_handler" {
   memory_size   = var.lambda_memory_size
   
   # Package the Lambda function from local directory
-  filename = "${path.module}/../backend/connect_handler.zip"
+  filename = "${path.module}/connect_handler.zip"
   
   # Environment variables
   environment {
@@ -61,7 +61,7 @@ resource "aws_lambda_function" "disconnect_handler" {
   memory_size   = var.lambda_memory_size
   
   # Package the Lambda function from local directory
-  filename = "${path.module}/../backend/disconnect_handler.zip"
+  filename = "${path.module}/disconnect_handler.zip"
   
   # Environment variables
   environment {
@@ -87,7 +87,7 @@ resource "aws_lambda_function" "message_handler" {
   memory_size   = var.lambda_memory_size
   
   # Package the Lambda function from local directory
-  filename = "${path.module}/../backend/message_handler.zip"
+  filename = "${path.module}/message_handler.zip"
   
   # Environment variables
   environment {
@@ -114,7 +114,7 @@ resource "aws_lambda_function" "users_handler" {
   memory_size   = var.lambda_memory_size
   
   # Package the Lambda function from local directory
-  filename = "${path.module}/../backend/users_handler.zip"
+  filename = "${path.module}/users_handler.zip"
   
   # Environment variables
   environment {

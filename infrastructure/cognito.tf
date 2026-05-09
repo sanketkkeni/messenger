@@ -31,9 +31,4 @@ resource "aws_cognito_user_pool_client" "family_messenger_client" {
   access_token_validity  = 1    # 1 hour
   id_token_validity      = 1    # 1 hour
   refresh_token_validity = 30   # 30 days
-
-  # OAuth settings (if needed)
-  allowed_oauth_flows_user_pool_client = true
-  allowed_oauth_scopes = ["email", "openid", "profile"]
-  allowed_oauth_flows = ["code", "implicit"]
 }

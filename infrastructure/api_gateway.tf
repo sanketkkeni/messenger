@@ -16,12 +16,6 @@ resource "aws_apigatewayv2_stage" "websocket_stage" {
   name        = "$default"
   auto_deploy = true
 
-  default_route_settings {
-    detailed_metrics_enabled = true
-    logging_level            = "INFO"
-    data_trace_enabled       = true
-  }
-
   tags = {
     Environment = var.environment
     Project     = var.project_name
@@ -52,21 +46,18 @@ resource "aws_apigatewayv2_integration" "connect_integration" {
   api_id           = aws_apigatewayv2_api.websocket_api.id
   integration_type = "AWS_PROXY"
   integration_uri  = aws_lambda_function.connect_handler.arn
-  payload_format_version = "2.0"
 }
 
 resource "aws_apigatewayv2_integration" "disconnect_integration" {
   api_id           = aws_apigatewayv2_api.websocket_api.id
   integration_type = "AWS_PROXY"
   integration_uri  = aws_lambda_function.disconnect_handler.arn
-  payload_format_version = "2.0"
 }
 
 resource "aws_apigatewayv2_integration" "message_integration" {
   api_id           = aws_apigatewayv2_api.websocket_api.id
   integration_type = "AWS_PROXY"
   integration_uri  = aws_lambda_function.message_handler.arn
-  payload_format_version = "2.0"
 }
 
 # Permissions for API Gateway to invoke Lambda functions
@@ -111,12 +102,6 @@ resource "aws_apigatewayv2_stage" "rest_stage" {
   name        = "$default"
   auto_deploy = true
 
-  default_route_settings {
-    detailed_metrics_enabled = true
-    logging_level            = "INFO"
-    data_trace_enabled       = true
-  }
-
   tags = {
     Environment = var.environment
     Project     = var.project_name
@@ -135,7 +120,6 @@ resource "aws_apigatewayv2_integration" "users_integration" {
   api_id           = aws_apigatewayv2_api.rest_api.id
   integration_type = "AWS_PROXY"
   integration_uri  = aws_lambda_function.users_handler.arn
-  payload_format_version = "2.0"
 }
 
 # Permissions for REST API Gateway to invoke Lambda function
