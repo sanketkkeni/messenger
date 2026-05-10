@@ -151,6 +151,17 @@ The connect handler validates tokens by decoding the JWT payload without cryptog
 3. Future message handlers can add additional validation if needed
 
 ### Future Considerations
+
+> **⚠️ SECURITY NOTE (Added 2026-05-10)**: AuthorizationType is currently set to NONE for $connect route. Token validation is done in the Lambda handler itself by extracting the JWT from query parameters. This is a TEMPORARY workaround. 
+> 
+> **TODO**: Re-enable proper authentication before production use:
+> 1. Re-enable the custom authorizer (aws_apigatewayv2_authorizer.websocket_authorizer)
+> 2. Update connect_handler.py to use requestContext.authorizer.userId (remove token parsing from query params)
+> 3. Update frontend to NOT send token in query parameters
+> 4. Verify the authorizer is being invoked properly (no Lambda logs = authorizer not running)
+>
+> See Issue #1 above for details on why we bypassed the authorizer temporarily.
+
 - Consider re-enabling custom authorizer with proper `identity_source` configuration
 - Add token expiration validation in `validate_token()`
 - Implement connection cleanup on disconnect

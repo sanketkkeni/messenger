@@ -46,6 +46,12 @@
 - Remove duplicate output definitions before running terraform init/plan
 - Use proper AWS provider syntax (check AWS provider docs for correct arguments)
 - Always follow existing project patterns (e.g., Lambda timeout=30, memory_size=256)
+- **NEVER commit changes automatically** - only commit when explicitly requested by user
+
+## Git Workflow
+- **NEVER run `git add`, `git commit`, or `git push` without explicit user instruction**
+- If user asks "should I commit?" or "do you want to commit?", wait for explicit confirmation
+- If user says "commit these changes", proceed with add and commit
 
 ## Workflow
 1. Make file changes first

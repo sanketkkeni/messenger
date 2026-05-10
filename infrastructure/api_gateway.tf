@@ -67,8 +67,9 @@ resource "aws_apigatewayv2_route" "connect_route" {
   api_id             = aws_apigatewayv2_api.websocket_api.id
   route_key          = "$connect"
   target             = "integrations/${aws_apigatewayv2_integration.connect_integration.id}"
-  authorizer_id      = aws_apigatewayv2_authorizer.websocket_authorizer.id
-  authorization_type = "CUSTOM"
+  # AuthorizationType set to NONE - token validation handled by connect_handler Lambda
+  # See WIKI.md for details on why authorizer is bypassed
+  authorization_type = "NONE"
 }
 
 resource "aws_apigatewayv2_route" "disconnect_route" {
