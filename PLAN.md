@@ -81,11 +81,15 @@ messenger/
 - Returns appropriate error responses for invalid tokens
 
 ### 2.3 Connection Handler (`connect_handler.py`)
-- Extracts UserId from validated JWT claims
+- Extracts UserId from validated JWT claims (two methods):
+  1. From authorizer context (if custom authorizer used)
+  2. Direct from query parameters (fallback for AuthorizationType: NONE)
 - Stores UserId and connectionId in Connections table
-- Handles connection metadata (timestamp, user agent if available)
-- Returns appropriate status codes
-- Implements idempotency for duplicate connections
+- Returns appropriate status codes (200, 401, 500)
+
+Note: Unlike the original plan, the connect handler performs direct token
+validation instead of relying solely on the authorizer. This provides
+reliability when the custom authorizer is bypassed or not invoked.
 
 ### 2.4 Disconnect Handler (`disconnect_handler.py`)
 - Extracts connectionId from WebSocket event
@@ -278,22 +282,43 @@ messenger/
 
 ## Milestones
 
-1. **Milestone 1**: Infrastructure provisioning (Cognito, DynamoDB, IAM)
-   - Deliverable: Working Terraform setup that creates foundational resources
+### Completed Milestones
 
-2. **Milestone 2**: API Gateway and Lambda functions
-   - Deliverable: Deployable backend that handles authentication and connections
+1. **Milestone 1**: Infrastructure provisioning (Cognito, DynamoDB, IAM) ✅
+   - All Terraform files created and applied
+   - Cognito User Pool configured with email verification
+   - DynamoDB tables for connections and messages
 
-3. **Milestone 3**: Basic frontend authentication
-   - Deliverable: Login/signup pages that integrate with Cognito
+2. **Milestone 2**: API Gateway and Lambda functions ✅
+   - WebSocket API with $connect, $disconnect, sendMessage routes
+   - REST API with /users endpoint
+   - All 5 Lambda functions deployed
 
-4. **Milestone 4**: Real-time messaging functionality
-   - Deliverable: Working WebSocket connection and message passing
+3. **Milestone 3**: Basic frontend authentication ✅
+   - Login/signup/confirm pages implemented
+   - Cognito SDK integration working
+   - Token storage in localStorage
 
-5. **Milestone 5**: Complete UI/UX with all features
-   - Deliverable: Polished, responsive interface with dark mode
+4. **Milestone 4**: Real-time messaging functionality ✅
+   - WebSocket connection established (resolved token validation issue)
+   - Connection stored in DynamoDB
+   - Contact list loading from /users endpoint
 
-6. **Milestone 6**: Testing, documentation, and deployment
-   - Deliverable: Production-ready application with comprehensive documentation
+5. **Milestone 5**: Testing & Documentation
+   - Playwright tests for WebSocket debugging
+   - WIKI.md with issue resolution history
+   - Code comments throughout codebase
+   - AGENTS.md for AI assistant workflow
+
+### Remaining Work
+
+6. **Milestone 6**: Message delivery verification
+   - `message_handler` Lambda exists but end-to-end messaging not tested
+   - DynamoDB message persistence not verified
+
+7. **Milestone 7**: UI polish and features
+   - Basic chat interface working
+   - Message history display needs enhancement
+   - Responsive design improvements
 
 This plan provides a comprehensive roadmap for building the serverless real-time family messenger application following all specified requirements and best practices.

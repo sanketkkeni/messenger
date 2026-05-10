@@ -66,24 +66,22 @@
 - Root level: README.md, PLAN.md, WIKI.md, AGENTS.md
 
 ## Frontend Testing
-- Use Jest + React Testing Library for unit/integration tests
-- Test config: `jest.config.js`, `jest.setup.js`
-- Test files location: `frontend/__tests__/`
-- Test commands:
-  - `npm test` - Run all tests
-  - `npm run test:watch` - Watch mode
-  - `npm run test:coverage` - With coverage report
+- **Jest**: Unit/integration tests in `frontend/__tests__/`
+  - `cmd /c "npm test"` - Run all tests
+- **Playwright**: E2E tests in `frontend/tests/`
+  - `cmd /c "npx playwright test"` - Run E2E tests
+  - Useful for WebSocket debugging
 - Always mock external dependencies (auth context, router, AWS SDK)
 - Use `waitFor` from testing-library for async operations
 - Coverage target: aim for 70%+ on critical components
 
-## Frontend Code Quality
-- Use Next.js 14 with App Router conventions
-- Use `router.query` instead of `useSearchParams()` to avoid Suspense issues
-- Import ConfirmSignUpCommand directly (not dynamically)
-- Pin dependency versions in package.json (avoid "latest")
-- Run `npm install` in frontend directory for dependencies
-- Add NODE_PATH or use `C:\Program Files\nodejs` if PATH issues arise
+## Debugging WebSocket Issues
+When WebSocket shows "Disconnected":
+1. Check Playwright test output for connection errors
+2. View CloudWatch logs: `aws logs filter-log-events --log-group-name /aws/lambda/family-messenger-connect-handler --start-time <timestamp>`
+3. Check API Gateway access logs: `/aws/apigateway/family-messenger/websocket`
+4. Verify Lambda zip includes all Python dependencies (pyjwt, jose, etc.)
+5. Test Lambda directly: `aws lambda invoke --function-name <name> --payload file://test.json --cli-binary-format raw-in-base64-out output.txt`
 
 ## Documentation
 - **Wiki**: Document all issues, solutions, and architecture decisions in `WIKI.md`

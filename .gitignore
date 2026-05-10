@@ -104,3 +104,7 @@ route-settings.json
 route_update.json
 test_authorizer.json
 next_steps.md
+
+# AI Chat History (private)
+.aider.chat.history.md
+next_steps.md

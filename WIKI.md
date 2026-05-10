@@ -115,7 +115,34 @@ def lambda_handler(event, context):
 
 ---
 
-## Architecture Decisions
+## Project Summary
+
+### What We Built
+A real-time messaging application with the following architecture:
+
+**Frontend (Next.js)**
+- User authentication via AWS Cognito
+- WebSocket connection for real-time messaging
+- Chat interface with contact list and message display
+
+**Backend (AWS Lambda + API Gateway)**
+- WebSocket API for real-time connections
+- REST API for user discovery
+- DynamoDB for storing connection mappings and messages
+
+**Infrastructure (Terraform)**
+- WebSocket API Gateway with $connect, $disconnect, and sendMessage routes
+- REST API Gateway for /users endpoint
+- Lambda functions for each handler
+- Cognito User Pool for authentication
+- DynamoDB tables for connections and messages
+
+### Current Status
+- [x] User authentication (sign up, sign in, sign out)
+- [x] WebSocket connection (established and working)
+- [x] User discovery (list users from Cognito)
+- [ ] Real-time message delivery (message_handler Lambda exists but untested)
+- [ ] Message persistence (DynamoDB write happens but not verified)
 
 ### Token Validation Strategy
 The connect handler validates tokens by decoding the JWT payload without cryptographic verification. This is acceptable because:

@@ -1,3 +1,20 @@
+/**
+ * Chat Page - Main Messaging Interface
+ * 
+ * This page provides the real-time messaging interface where users can:
+ * - View list of registered users (contacts)
+ * - Select a contact to start a conversation
+ * - Send and receive messages via WebSocket
+ * - See connection status (Connected/Disconnected)
+ * 
+ * Data Flow:
+ * 1. On load, fetch list of users from REST API /users endpoint
+ * 2. User selects a contact from the sidebar
+ * 3. Messages for the conversation are filtered and displayed
+ * 4. User types and sends message via WebSocket
+ * 5. message_handler Lambda routes message to recipient's WebSocket
+ */
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
@@ -6,6 +23,7 @@ import { fetchUsers } from '../lib/websocket';
 import { getStoredTokens, getStoredUserId } from '../lib/auth';
 import { MessageSquare, LogOut, Send, Users, X } from 'lucide-react';
 
+// Type definitions
 interface User {
   username: string;
   email: string;
@@ -19,16 +37,38 @@ interface Message {
   conversationId: string;
 }
 
+/**
+ * Generate a consistent conversation ID from two user IDs
+ * 
+ * The ID is deterministic regardless of which user initiates the conversation.
+ * Format: "smallerId#largerId"
+ */
+const getConversationId = (user1: string, user2: string): string => {
+  const sorted = [user1, user2].sort();
+  return `${sorted[0]}#${sorted[1]}`;
+};
+
+/**
+ * Chat Page Component
+ * 
+ * Main layout:
+ * - Header: App title, connection status, user info, sign out button
+ * - Sidebar: List of contacts/users
+ * - Main area: Message thread with selected user or empty state
+ */
 export default function Chat() {
   const router = useRouter();
   const { user, signOut } = useAuth();
-  const { connected, sendMessage, messages, clearMessages } = useWebSocket();
+  const { connected, sendMessage, messages } = useWebSocket();
+  
+  // User list state
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [messageText, setMessageText] = useState('');
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Redirect to login if not authenticated
   useEffect(() => {
     if (!user) {
       router.push('/login');
@@ -42,7 +82,9 @@ export default function Chat() {
         return;
       }
 
+      // Fetch registered users from REST API
       const fetchedUsers = await fetchUsers(tokens.accessToken);
+      // Filter out current user from contact list
       setUsers(fetchedUsers.filter(u => u.username !== user?.username));
       setLoading(false);
     };
@@ -50,13 +92,19 @@ export default function Chat() {
     loadUsers();
   }, [user, router]);
 
+  /**
+   * Send message to the selected user
+   * Message is sent via WebSocket to message_handler Lambda
+   */
   const handleSend = () => {
     if (!messageText.trim() || !selectedUser) return;
 
+    // sendMessage sends via WebSocket with action: 'sendMessage'
     sendMessage(selectedUser.username, messageText);
     setMessageText('');
   };
 
+  // Handle Enter key for sending message (without Shift)
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -64,40 +112,43 @@ export default function Chat() {
     }
   };
 
+  // Sign out and redirect to login
   const handleSignOut = () => {
     signOut();
     router.push('/login');
   };
 
+  // Get current user's ID for message alignment
+  const currentUserId = getStoredUserId();
+
+  // Filter messages for the current conversation
   const filteredMessages = messages.filter(
     msg => msg.conversationId === getConversationId(user?.username || '', selectedUser?.username || '')
   );
 
-  const getConversationId = (user1: string, user2: string) => {
-    const sorted = [user1, user2].sort();
-    return `${sorted[0]}#${sorted[1]}`;
-  };
-
-  const currentUserId = getStoredUserId();
-
   return (
     <div className="min-h-screen bg-dark-900 text-white flex flex-col">
-      {/* Header */}
+      {/* Header with app title, connection status, and user menu */}
       <header className="bg-dark-800 border-b border-dark-600 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
+            {/* Mobile menu toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="md:hidden p-2 hover:bg-dark-700 rounded-lg"
             >
               <Users className="h-5 w-5" />
             </button>
+            
             <MessageSquare className="h-6 w-6 text-primary-500" />
             <span className="text-lg font-bold">Family Messenger</span>
+            
+            {/* WebSocket connection status indicator */}
             <span className={`ml-2 px-2 py-1 rounded-full text-xs ${connected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
               {connected ? 'Connected' : 'Disconnected'}
             </span>
           </div>
+          
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-400 hidden sm:inline">{user?.email}</span>
             <button
@@ -111,13 +162,14 @@ export default function Chat() {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main Content: Sidebar + Chat Area */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar - User List */}
+        {/* User List Sidebar */}
         <aside className={`${mobileMenuOpen ? 'block' : 'hidden'} md:block w-full md:w-80 bg-dark-800 border-r border-dark-600 flex flex-col`}>
           <div className="p-4 border-b border-dark-600">
             <h2 className="text-lg font-semibold">Contacts</h2>
           </div>
+          
           <div className="flex-1 overflow-y-auto">
             {loading ? (
               <div className="p-4 text-center text-gray-400">Loading contacts...</div>
@@ -137,6 +189,7 @@ export default function Chat() {
                       }`}
                     >
                       <div className="flex items-center gap-3">
+                        {/* Avatar with first letter */}
                         <div className="w-10 h-10 bg-primary-500/20 rounded-full flex items-center justify-center">
                           <span className="text-primary-400 font-semibold">
                             {u.email.charAt(0).toUpperCase()}
@@ -159,7 +212,7 @@ export default function Chat() {
         <main className="flex-1 flex flex-col bg-dark-900">
           {selectedUser ? (
             <>
-              {/* Chat Header */}
+              {/* Chat Header with recipient info */}
               <div className="bg-dark-800 border-b border-dark-600 px-4 py-3 flex items-center gap-3">
                 <div className="w-10 h-10 bg-primary-500/20 rounded-full flex items-center justify-center">
                   <span className="text-primary-400 font-semibold">
@@ -170,6 +223,7 @@ export default function Chat() {
                   <h3 className="font-semibold">{selectedUser.email}</h3>
                   <p className="text-sm text-gray-400">{selectedUser.username}</p>
                 </div>
+                {/* Close button on mobile */}
                 <button
                   onClick={() => setSelectedUser(null)}
                   className="md:hidden ml-auto p-2 hover:bg-dark-700 rounded-lg"
@@ -178,7 +232,7 @@ export default function Chat() {
                 </button>
               </div>
 
-              {/* Messages */}
+              {/* Message List */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {filteredMessages.length === 0 ? (
                   <div className="text-center text-gray-400 py-8">
@@ -188,6 +242,7 @@ export default function Chat() {
                   filteredMessages.map((msg, idx) => (
                     <div
                       key={idx}
+                      // Align messages: right for current user, left for recipient
                       className={`flex ${msg.senderId === currentUserId ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
@@ -207,7 +262,7 @@ export default function Chat() {
                 )}
               </div>
 
-              {/* Input Area */}
+              {/* Message Input */}
               <div className="bg-dark-800 border-t border-dark-600 p-4">
                 <div className="flex gap-3">
                   <textarea
@@ -229,6 +284,7 @@ export default function Chat() {
               </div>
             </>
           ) : (
+            /* Empty state when no conversation selected */
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
                 <MessageSquare className="h-16 w-16 text-gray-600 mx-auto mb-4" />

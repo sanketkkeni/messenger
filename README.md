@@ -1,6 +1,6 @@
 # Serverless Real-Time Family Messenger
 
-A production-ready, serverless messaging application with real-time capabilities and secure authentication using AWS services.
+A production-ready, serverless messaging application with real-time WebSocket capabilities and secure authentication using AWS services.
 
 ## Architecture Overview
 
@@ -9,390 +9,176 @@ A production-ready, serverless messaging application with real-time capabilities
 │   Frontend      │     │   API Gateway   │     │   Lambda        │
 │   (Next.js)     │◄───►│   (WebSocket)   │────►│   Functions     │
 └─────────────────┘     └─────────────────┘     └────────┬────────┘
-                                                         │
-                        ┌─────────────────┐              │
-                        │   DynamoDB      │◄─────────────┤
-                        │   - Connections │              │
-                        │   - Messages    │              │
-                        └─────────────────┘              │
-                                                         │
-                        ┌─────────────────┐              │
-                        │   Cognito       │◄─────────────┘
-                        │   (Auth)        │
-                        └─────────────────┘
+                                                          │
+                         ┌─────────────────┐              │
+                         │   DynamoDB      │◄─────────────┤
+                         │   - Connections │              │
+                         │   - Messages    │              │
+                         └─────────────────┘              │
+                                                          │
+                         ┌─────────────────┐              │
+                         │   Cognito       │◄─────────────┘
+                         │   (Auth)        │
+                         └─────────────────┘
 ```
 
-## Prerequisites
+## Quick Start
 
-- **AWS Account** with appropriate permissions
-- **Terraform** >= 1.15.2
-- **Node.js** >= 18.x
-- **Python** >= 3.13 (for local development/testing)
+### 1. Deploy Infrastructure
+```bash
+cd infrastructure
+terraform init
+terraform apply
+```
+
+### 2. Configure Frontend
+Create `frontend/.env.local` with outputs from terraform:
+```env
+NEXT_PUBLIC_AWS_REGION=us-east-1
+NEXT_PUBLIC_USER_POOL_ID=us-east-1_xxxxxxxxx
+NEXT_PUBLIC_USER_POOL_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
+NEXT_PUBLIC_WEBSOCKET_ENDPOINT=wss://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/$default
+NEXT_PUBLIC_REST_API_ENDPOINT=https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/$default
+```
+
+### 3. Start Development
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
 ## Project Structure
 
 ```
 messenger/
-├── infrastructure/          # Terraform IaC files
-│   ├── main.tf              # Terraform configuration
-│   ├── variables.tf         # Input variables
-│   ├── outputs.tf           # Output values
-│   ├── cognito.tf           # Cognito User Pool & Client
-│   ├── dynamodb.tf          # DynamoDB Tables
-│   ├── iam.tf              # IAM Roles & Policies
-│   ├── api_gateway.tf      # API Gateway (WebSocket & REST)
+├── infrastructure/          # Terraform IaC
+│   ├── main.tf             # Provider & remote config
+│   ├── variables.tf        # Input variables
+│   ├── outputs.tf          # Output values
+│   ├── cognito.tf          # Cognito User Pool
+│   ├── dynamodb.tf         # DynamoDB Tables
+│   ├── iam.tf              # IAM Roles
+│   ├── api_gateway.tf      # WebSocket & REST APIs
 │   └── lambda.tf           # Lambda Functions
-├── backend/                 # Python Lambda functions
+├── backend/                 # Python Lambda handlers
 │   ├── utils.py            # Shared utilities
-│   ├── authorizer.py       # JWT validation
-│   ├── connect_handler.py  # WebSocket connect
-│   ├── disconnect_handler.py # WebSocket disconnect
-│   ├── message_handler.py  # Message routing
-│   └── users_handler.py    # REST API endpoint
+│   ├── authorizer.py       # JWT authorizer
+│   ├── connect_handler.py  # WebSocket $connect
+│   ├── disconnect_handler.py # WebSocket $disconnect
+│   ├── message_handler.py   # Message routing
+│   └── users_handler.py     # REST /users endpoint
 ├── frontend/               # Next.js application
-│   ├── pages/             # Page components
-│   ├── components/       # Reusable components
-│   ├── lib/              # Utilities (auth, websocket)
-│   ├── context/          # React contexts
-│   ├── __tests__/        # Jest test files
-│   ├── styles/           # CSS files
-│   ├── jest.config.js    # Jest configuration
-│   └── jest.setup.js     # Test setup
-└── README.md             # This file
+│   ├── pages/              # Page components
+│   ├── context/            # Auth & WebSocket providers
+│   ├── lib/                # Auth & WebSocket modules
+│   ├── __tests__/         # Jest tests
+│   └── tests/              # Playwright tests
+├── WIKI.md                 # Debugging guide & issues
+├── AGENTS.md               # Agent rules for AI assistants
+└── README.md               # This file
 ```
 
-## Deployment
+## Key Components
 
-### Step 1: Infrastructure Setup (Terraform)
+### WebSocket Connection Flow
+1. Client connects with JWT token: `wss://...?Authorization=<token>`
+2. `connect_handler` validates token and stores `connectionId` in DynamoDB
+3. Client sends messages via WebSocket to `message_handler`
+4. `message_handler` routes messages between users via API Gateway Management API
 
-1. **Initialize Terraform:**
-   ```bash
-   cd infrastructure
-   terraform init
-   ```
+### REST API
+- **GET /users** - List registered users from Cognito
+- Returns cached results for 30 seconds
 
-2. **Create a variables file (optional):**
-   Create `dev.tfvars` with your configuration:
-   ```hcl
-   aws_region        = "us-east-1"
-   environment       = "dev"
-   project_name      = "family-messenger"
-   ```
+## Updating Lambda Functions
 
-3. **Plan the infrastructure:**
-   ```bash
-   terraform plan -var-file="dev.tfvars"
-   # Or without vars file:
-   terraform plan
-   ```
+When you modify Python handlers in `backend/`:
 
-4. **Apply the infrastructure:**
-   ```bash
-   terraform apply -var-file="dev.tfvars"
-   # Or without vars file:
-   terraform apply
-   ```
+```bash
+# 1. Create zip file
+cd backend
+python -c "import zipfile, os; z = zipfile.ZipFile('handler.zip', 'w', zipfile.ZIP_DEFLATED); [z.write(os.path.join(r,f)) for r,d,files in os.walk('.') for f in files if f.endswith('.py')]; z.close()"
 
-   Type `yes` when prompted to confirm.
+# 2. Deploy to AWS
+aws lambda update-function-code --function-name family-messenger-connect-handler --zip-file fileb://connect_handler.zip --no-cli-pager
+```
 
-5. **Get the outputs:**
-   ```bash
-   terraform output
-   ```
+## Testing
 
-   Note down these important values:
-   - `user_pool_id`
-   - `user_pool_client_id`
-   - `websocket_api_endpoint`
-   - `rest_api_endpoint`
+### Playwright Tests (WebSocket)
+```bash
+cd frontend
+cmd /c "npx playwright test"
+```
 
-### Step 2: Lambda Functions
+### Jest Tests (Unit)
+```bash
+cd frontend
+cmd /c "npm test"
+```
 
-The Lambda functions are deployed as part of the Terraform apply. However, if you need to update them separately:
+## Environment Variables
 
-1. **Package the Python functions:**
-   ```bash
-   cd backend
-
-   # Create zip for each function
-   zip authorizer.zip authorizer.py utils.py
-   zip connect_handler.zip connect_handler.py utils.py
-   zip disconnect_handler.zip disconnect_handler.py utils.py
-   zip message_handler.zip message_handler.py utils.py
-   zip users_handler.zip users_handler.py utils.py
-   ```
-
-2. **Update Lambda functions:**
-   ```bash
-   aws lambda update-function-code \
-     --function-name family-messenger-authorizer \
-     --zip-file fileb://authorizer.zip
-   ```
-
-### Step 3: Frontend Setup
-
-1. **Install dependencies:**
-   ```bash
-   cd frontend
-   npm install
-   ```
-
-2. **Configure environment variables:**
-   Create `.env.local` in the frontend directory:
-   ```env
-   NEXT_PUBLIC_AWS_REGION=us-east-1
-   NEXT_PUBLIC_USER_POOL_ID=<your-user-pool-id>
-   NEXT_PUBLIC_USER_POOL_CLIENT_ID=<your-client-id>
-   NEXT_PUBLIC_WEBSOCKET_ENDPOINT=wss://<your-websocket-api-id>.execute-api.us-east-1.amazonaws.com/$default
-   NEXT_PUBLIC_REST_API_ENDPOINT=https://<your-rest-api-id>.execute-api.us-east-1.amazonaws.com/$default
-   ```
-
-3. **Start development server:**
-   ```bash
-   npm run dev
-   ```
-
-4. **Build for production:**
-   ```bash
-   npm run build
-   npm run start
-   ```
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_AWS_REGION` | AWS region (e.g., us-east-1) |
+| `NEXT_PUBLIC_USER_POOL_ID` | Cognito User Pool ID |
+| `NEXT_PUBLIC_USER_POOL_CLIENT_ID` | Cognito Client ID |
+| `NEXT_PUBLIC_WEBSOCKET_ENDPOINT` | WebSocket API URL |
+| `NEXT_PUBLIC_REST_API_ENDPOINT` | REST API URL |
 
 ## WebSocket Message Contract
 
-### Client to Server
-
-#### Connect
-Connect to the WebSocket endpoint with the JWT token in the query parameter:
-```
-wss://<api-id>.execute-api.<region>.amazonaws.com/$default?Authorization=<jwt-token>
-```
-
-#### Send Message
+### Send Message (Client → Server)
 ```json
 {
   "action": "sendMessage",
-  "recipientId": "user@example.com",
-  "text": "Hello, how are you?"
+  "recipientId": "user-uuid",
+  "text": "Hello!"
 }
 ```
 
-**Required Fields:**
-- `action` (string): Must be "sendMessage"
-- `recipientId` (string): The username/email of the recipient
-- `text` (string): The message content
-
-### Server to Client
-
-#### Incoming Message
+### Receive Message (Server → Client)
 ```json
 {
-  "senderId": "sender@example.com",
-  "text": "Hello, how are you?",
-  "timestamp": 1704067200000,
-  "conversationId": "user1@example.com#user2@example.com"
+  "senderId": "sender-uuid",
+  "text": "Hello!",
+  "timestamp": 1778371812000,
+  "conversationId": "uuid1#uuid2"
 }
 ```
 
-**Fields:**
-- `senderId` (string): Username of the sender
-- `text` (string): The message content
-- `timestamp` (number): Unix timestamp in milliseconds
-- `conversationId` (string): Unique conversation identifier
+## Documentation
 
-#### System Messages
-```json
-{
-  "type": "system",
-  "message": "Connection established"
-}
-```
+- [WIKI.md](WIKI.md) - Debugging guide, issues resolved, architecture decisions
+- [AGENTS.md](AGENTS.md) - AI agent rules and workflow guidelines
+- [PLAN.md](PLAN.md) - Original implementation plan
 
-#### Error Response
-```json
-{
-  "error": true,
-  "message": "Error description"
-}
-```
+## Troubleshooting
 
-## REST API
+### WebSocket Shows "Disconnected"
+1. Check browser console for detailed error
+2. Verify `.env.local` has correct endpoints
+3. Check CloudWatch logs: `/aws/lambda/family-messenger-connect-handler`
+4. Ensure JWT token is valid (log out and back in)
 
-### GET /users
+### Messages Not Delivering
+1. Verify both users show "Connected" status
+2. Check DynamoDB `family-messenger-connections` table
+3. Review CloudWatch logs for `message_handler` errors
 
-Retrieve all registered users from Cognito.
-
-**Request:**
-```http
-GET https://<api-id>.execute-api.<region>.amazonaws.com/$default/users
-Authorization: Bearer <jwt-token>
-```
-
-**Response:**
-```json
-{
-  "users": [
-    {
-      "username": "user1",
-      "email": "user1@example.com",
-      "email_verified": true,
-      "created_at": "2024-01-01T00:00:00Z",
-      "status": "CONFIRMED",
-      "enabled": true
-    }
-  ],
-  "count": 1
-}
-```
-
-## CloudWatch Logging
-
-All Lambda functions are configured with CloudWatch Logs:
-
-- **Log Group:** `/aws/lambda/family-messenger-<function-name>`
-- **Retention:** 30 days (configurable)
-- **Log Level:** INFO (can be changed via environment variable LOG_LEVEL)
-
-### Viewing Logs
-
-```bash
-# View recent logs for a specific function
-aws logs tail /aws/lambda/family-messenger-message-handler --follow
-
-# Search logs for errors
-aws logs filter-log-events \
-  --log-group-name /aws/lambda/family-messenger-message-handler \
-  --filter-pattern "ERROR"
-```
-
-### Metrics Dashboard
-
-The following CloudWatch metrics are automatically available:
-- Lambda invocations and errors
-- API Gateway request counts
-- WebSocket connection counts
-- DynamoDB read/write capacity
-
-## Security Considerations
-
-1. **JWT Token Validation:** All WebSocket connections and REST API calls require valid Cognito JWT tokens
-2. **CORS:** API Gateway is configured with appropriate CORS settings
-3. **IAM Roles:** Lambda functions have least-privilege permissions
-4. **DynamoDB:** Tables are created with PAY_PER_REQUEST billing for automatic scaling
-5. **Data Encryption:** All data at rest is encrypted using AWS managed keys
+### Lambda Errors
+1. View logs: `aws logs filter-log-events --log-group-name /aws/lambda/family-messenger-<handler>`
+2. Check Lambda configuration matches expected environment variables
+3. Verify Lambda zip contains all required dependencies
 
 ## Cleanup
-
-To destroy all resources created by Terraform:
 
 ```bash
 cd infrastructure
 terraform destroy
 ```
-
-Type `yes` when prompted to confirm deletion of all resources.
-
-## Troubleshooting
-
-### WebSocket Connection Issues
-- Verify the JWT token is valid and not expired
-- Check CloudWatch logs for Lambda authorizer errors
-- Ensure the WebSocket endpoint URL is correct
-
-### Message Delivery Issues
-- Check that the recipient is connected (look in Connections table)
-- Verify the recipient's user ID is correct
-- Review CloudWatch logs for message handler errors
-
-### DynamoDB Errors
-- Ensure IAM permissions are correct
-- Check table names match environment variables
-- Verify DynamoDB is available in the selected region
-
-## Performance Considerations
-
-- **DynamoDB:** PAY_PER_REQUEST billing handles variable load automatically
-- **Lambda:** Cold starts are minimized with provisioned concurrency (optional)
-- **API Gateway:** WebSocket connections are managed automatically
-- **Frontend:** Messages are queued when connection is lost and retried on reconnect
-
-## Development Workflow
-
-1. **Update Infrastructure:** Modify `.tf` files and run `terraform apply`
-2. **Update Backend:** Modify Python files, zip, and update Lambda functions
-3. **Update Frontend:** Modify React components and run `npm run dev`
-4. **Testing:** Use Jest + React Testing Library for automated tests
-
-## Testing
-
-### Frontend Testing Setup
-
-The project uses Jest + React Testing Library for automated tests.
-
-**Test Configuration:**
-- `jest.config.js` - Jest configuration with Next.js integration
-- `jest.setup.js` - Test setup file (imports jest-dom matchers)
-- `__tests__/` - Test files location
-
-**Test Commands:**
-```bash
-cd frontend
-
-npm test              # Run all tests
-npm run test:watch    # Watch mode for development
-npm run test:coverage # Run tests with coverage report
-```
-
-### Writing Tests
-
-**Example Test Structure:**
-```typescript
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import Login from '@/pages/login';
-
-// Mock external dependencies
-jest.mock('@/context/AuthContext', () => ({
-  useAuth: () => ({
-    signIn: mockSignIn,
-    loading: false,
-  }),
-}));
-
-describe('Login Page', () => {
-  it('renders login form', () => {
-    render(<Login />);
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-  });
-
-  it('calls signIn on submit', async () => {
-    mockSignIn.mockResolvedValueOnce({});
-    render(<Login />);
-    // ... test implementation
-  });
-});
-```
-
-### Coverage Target
-
-- **Goal:** 70%+ coverage on critical components
-- Focus on: auth flow, form validation, error handling
-- Current coverage: login (100%), signup (94%)
-
-### Testing Best Practices
-
-1. **Mock external dependencies** - Auth context, router, AWS SDK
-2. **Use `waitFor`** for async operations
-3. **Test user flows** - Not just unit tests
-4. **Cover error cases** - Invalid input, API failures
-5. **Keep tests isolated** - Reset mocks in `beforeEach`
-
-### Test Files
-
-| File | Purpose | Coverage |
-|------|---------|----------|
-| `__tests__/login.test.tsx` | Login page tests | 100% |
-| `__tests__/signup.test.tsx` | Signup page tests | 94% |
-| `__tests__/auth.test.ts` | Auth utility tests | 55% |
 
 ## License
 
