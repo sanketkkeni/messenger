@@ -90,6 +90,8 @@ def lambda_handler(event, context):
         HTTP response: 200 (connected), 401 (unauthorized), or 400/500 (error)
     """
     try:
+        print(f"DEBUG: connect_handler event keys: {list(event.keys())}")
+        
         request_context = event.get('requestContext', {})
         connection_id = request_context.get('connectionId')
         
@@ -100,16 +102,23 @@ def lambda_handler(event, context):
         # The authorizer injects principalId and context into requestContext
         authorizer = request_context.get('authorizer', {})
         user_id = authorizer.get('userId')
+        print(f"DEBUG: userId from authorizer: {user_id}")
         
         # Fallback: extract token from query parameters
         # This handles the case where AuthorizationType is NONE
         if not user_id:
             query_params = event.get('queryStringParameters', {}) or {}
             auth_param = query_params.get('Authorization') or query_params.get('authorization')
+            print(f"DEBUG: query params: {query_params}")
             if auth_param:
+                print(f"DEBUG: validate_token called with token: {auth_param[:50]}...")
                 user_id = validate_token(auth_param)
+                print(f"DEBUG: validate_token result: {user_id}")
+
+        print(f"DEBUG: final user_id: {user_id}")
         
         if not user_id:
+            print("DEBUG: Could not extract userId from any source")
             return create_response(401, {'message': 'Unauthorized'})
         
         # Store connection mapping in DynamoDB
@@ -118,7 +127,9 @@ def lambda_handler(event, context):
         if not success:
             return create_response(500, {'message': 'Internal server error'})
         
+        print(f"User {user_id} connected with connection ID {connection_id}")
         return create_response(200, {'message': 'Connected'})
         
-    except Exception:
+    except Exception as e:
+        print(f"Connect handler error: {str(e)}")
         return create_response(500, {'message': 'Internal server error'})

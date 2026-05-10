@@ -32,6 +32,11 @@ const reconnectDelay = 1000;
 let messageCallbacks: ((data: any) => void)[] = [];
 let connectionCallbacks: ((status: 'connected' | 'disconnected' | 'connecting') => void)[] = [];
 
+export function clearAllCallbacks(): void {
+  messageCallbacks = [];
+  connectionCallbacks = [];
+}
+
 /**
  * Register a callback for incoming WebSocket messages
  * @param callback - Function called with parsed message data
@@ -41,11 +46,25 @@ export function onMessage(callback: (data: any) => void): void {
 }
 
 /**
+ * Unregister a callback for incoming WebSocket messages
+ */
+export function offMessage(callback: (data: any) => void): void {
+  messageCallbacks = messageCallbacks.filter(cb => cb !== callback);
+}
+
+/**
  * Register a callback for connection status changes
  * @param callback - Function called with new connection status
  */
 export function onConnectionChange(callback: (status: 'connected' | 'disconnected' | 'connecting') => void): void {
   connectionCallbacks.push(callback);
+}
+
+/**
+ * Unregister a callback for connection status changes
+ */
+export function offConnectionChange(callback: (status: 'connected' | 'disconnected' | 'connecting') => void): void {
+  connectionCallbacks = connectionCallbacks.filter(cb => cb !== callback);
 }
 
 /**

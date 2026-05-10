@@ -13,8 +13,8 @@
  * 3. API Gateway authorizer validates the token before allowing $connect route
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { connect, disconnect, sendMessage, onMessage, onConnectionChange } from '../lib/websocket';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { connect, disconnect, sendMessage, onMessage, onConnectionChange, offMessage, offConnectionChange } from '../lib/websocket';
 import { getStoredTokens } from '../lib/auth';
 
 interface Message {
@@ -42,6 +42,29 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
 
+  // Use useCallback to create stable function references for cleanup
+  const handleConnectionChange = useCallback((status: 'connected' | 'disconnected' | 'connecting') => {
+    console.log('[WebSocketContext] Connection status changed:', status);
+    setConnected(status === 'connected');
+  }, []);
+
+  const handleNewMessage = useCallback((data: Message) => {
+    // Deduplicate by checking if we already received this exact message
+    setMessages((prev) => {
+      const isDuplicate = prev.some(
+        m => m.senderId === data.senderId && 
+             m.text === data.text && 
+             m.timestamp === data.timestamp &&
+             m.conversationId === data.conversationId
+      );
+      if (isDuplicate) {
+        console.log('[WebSocketContext] Ignoring duplicate message');
+        return prev;
+      }
+      return [...prev, data];
+    });
+  }, []);
+
   // Initialize WebSocket connection on component mount
   useEffect(() => {
     console.log('[WebSocketContext] Initializing...');
@@ -54,26 +77,18 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       connect(tokens.idToken).catch(console.error);
     }
 
-    // Register callback for connection status changes (connected/disconnected/connecting)
-    const handleConnectionChange = (status: 'connected' | 'disconnected' | 'connecting') => {
-      console.log('[WebSocketContext] Connection status changed:', status);
-      setConnected(status === 'connected');
-    };
-
-    // Register callback for incoming messages from WebSocket
-    const handleNewMessage = (data: Message) => {
-      setMessages((prev) => [...prev, data]);
-    };
-
     // Register the callbacks with the websocket module
     onConnectionChange(handleConnectionChange);
     onMessage(handleNewMessage);
 
-    // Cleanup: disconnect when component unmounts or user leaves page
+    // Cleanup: unregister callbacks and disconnect when component unmounts
     return () => {
+      console.log('[WebSocketContext] Cleaning up...');
+      offConnectionChange(handleConnectionChange);
+      offMessage(handleNewMessage);
       disconnect();
     };
-  }, []); // Empty deps array = runs once on mount
+  }, [handleConnectionChange, handleNewMessage]);
 
   // Send a message via WebSocket to a specific recipient
   const handleSendMessage = (recipientId: string, text: string): boolean => {

@@ -1,12 +1,37 @@
 import json
+import base64
 from utils import (
-    get_connection_user, 
-    get_user_connections, 
-    get_conversation_id, 
-    save_message, 
-    send_websocket_message, 
+    get_connection_user,
+    get_user_connections,
+    get_conversation_id,
+    save_message,
+    send_websocket_message,
     create_response
 )
+
+
+def validate_token(token: str):
+    """Extract userId from JWT token payload."""
+    try:
+        if not token:
+            return None
+        if token.startswith('Bearer '):
+            token = token[7:]
+        parts = token.split('.')
+        if len(parts) != 3:
+            return None
+        payload_b64 = parts[1]
+        padding = 4 - (len(payload_b64) % 4)
+        if padding != 4:
+            payload_b64 += '=' * padding
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        user_id = payload.get('cognito:username') or payload.get('username') or payload.get('sub')
+        if not user_id:
+            user_id = payload.get('email')
+        return user_id
+    except Exception:
+        return None
+
 
 def lambda_handler(event, context):
     """
@@ -14,12 +39,25 @@ def lambda_handler(event, context):
     Process incoming messages and route to recipients
     """
     try:
-        request_context = event.get('requestContext', {})
-        authorizer = request_context.get('authorizer', {})
-        sender_id = authorizer.get('userId')
+        print(f"DEBUG: message_handler event: {json.dumps(event)}")
         
+        request_context = event.get('requestContext', {})
+        connection_id = request_context.get('connectionId')
+        
+        # Get sender_id from connection mapping in DynamoDB
+        # This works because we stored UserId -> connectionId during $connect
+        sender_id = get_connection_user(connection_id)
+        print(f"DEBUG: sender_id from DynamoDB: {sender_id}")
+
+        # Fallback: check query params (for testing via direct Lambda invocation)
         if not sender_id:
-            return create_response(401, {'message': 'Unauthorized'})
+            query_params = event.get('queryStringParameters', {}) or {}
+            auth_param = query_params.get('Authorization') or query_params.get('authorization')
+            if auth_param:
+                sender_id = validate_token(auth_param)
+                print(f"DEBUG: sender_id from token fallback: {sender_id}")
+
+        print(f"DEBUG: final sender_id: {sender_id}")
         
         connection_id = request_context.get('connectionId')
         body = event.get('body', '{}')
