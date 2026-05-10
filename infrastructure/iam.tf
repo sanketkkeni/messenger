@@ -90,3 +90,48 @@ resource "aws_iam_role_policy_attachment" "lambda_cognito" {
   role       = aws_iam_role.lambda_role.name
   policy_arn = aws_iam_policy.lambda_cognito_read.arn
 }
+
+# IAM Role for API Gateway Access Logging
+resource "aws_iam_role" "apigateway_logging" {
+  name = "${var.project_name}-apigateway-logging"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "apigateway.amazonaws.com"
+      }
+    }]
+  })
+}
+
+resource "aws_iam_policy" "apigateway_logging" {
+  name = "${var.project_name}-apigateway-logging"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
+          "logs:PutLogEvents",
+          "logs:GetLogRecord",
+          "logs:FilterLogEvents"
+        ]
+        Resource = [
+          "arn:aws:logs:*:*:*"
+        ]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "apigateway_logging" {
+  role       = aws_iam_role.apigateway_logging.name
+  policy_arn = aws_iam_policy.apigateway_logging.arn
+}

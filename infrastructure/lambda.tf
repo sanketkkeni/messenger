@@ -105,6 +105,8 @@ resource "aws_lambda_function" "message_handler" {
 }
 
 # Lambda Function: Users Handler
+# Updated to include CORS multiValueHeaders support - v2
+# Zip hash: NDEXMjQ3Rjg4MUQwQ0Y5NTAyRTlBQkUxNDRGRDVFNzU=
 resource "aws_lambda_function" "users_handler" {
   function_name = "${var.project_name}-users-handler"
   runtime       = var.lambda_runtime
@@ -112,7 +114,9 @@ resource "aws_lambda_function" "users_handler" {
   role          = aws_iam_role.lambda_role.arn
   timeout       = var.lambda_timeout
   memory_size   = var.lambda_memory_size
-  
+
+  description   = "Handles user list requests with CORS support - v2"
+
   # Package the Lambda function from local directory
   filename = "${path.module}/users_handler.zip"
   

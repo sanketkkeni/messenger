@@ -45,13 +45,20 @@ def get_cognito_keys():
         return []
 
 def validate_jwt_token(token):
-    """Validate a JWT token issued by Cognito"""
+    """
+    Validates a JWT token issued by Amazon Cognito.
+    
+    Ensures the token is authentic, unexpired, and intended for this application's
+    client ID to prevent unauthorized access or token replay attacks.
+    """
     try:
-        # Get the token header to find the key ID
+        # The 'kid' (Key ID) in the header identifies which public key from
+        # the JWKS should be used to verify this token's signature.
         headers = jwt.get_unverified_header(token)
         kid = headers['kid']
         
-        # Get Cognito public keys
+        # Retrieve and find the matching public key. Verifying against the correct
+        # key is essential to guarantee the token was signed by the expected Cognito User Pool.
         keys = get_cognito_keys()
         key = None
         for k in keys:
@@ -62,29 +69,34 @@ def validate_jwt_token(token):
         if not key:
             raise Exception("Unable to find appropriate key")
         
-        # Construct the public key
+        # Construct the public key object for signature verification.
         public_key = jwk.construct(key)
         
-        # Verify the token
+        # Perform signature verification to ensure the token has not been tampered
+        # with since it was issued by Cognito.
         message, encoded_signature = token.rsplit('.', 1)
         decoded_signature = base64url_decode(encoded_signature.encode('utf-8'))
         
         if not public_key.verify(message.encode("utf8"), decoded_signature):
             raise Exception("Signature verification failed")
         
-        # Get claims
+        # Claims extraction - we trust the claims only AFTER signature verification.
         claims = jwt.get_unverified_claims(token)
         
-        # Check expiration
+        # Check expiration to prevent the use of old, potentially compromised tokens.
         if time.time() > claims['exp']:
             raise Exception("Token is expired")
         
-        # Check audience
+        # Verify the audience ('aud') claim ensures the token was specifically
+        # issued for this application, preventing tokens from other apps
+        # from being used to access our API.
         if CLIENT_ID and claims.get('aud') != CLIENT_ID and claims.get('client_id') != CLIENT_ID:
             raise Exception("Token was not issued for this audience")
         
         return claims
     except Exception as e:
+        # Log the specific validation failure for debugging, but return None
+        # to indicate an unauthenticated state to the caller.
         print(f"JWT validation error: {str(e)}")
         return None
 

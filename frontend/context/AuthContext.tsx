@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { signIn, signUp, getUser, storeTokens, clearTokens, getStoredTokens, storeUserId, getStoredUserId, User } from '../lib/auth';
+import { connect } from '../lib/websocket';
 
+// Context type definition with WebSocket reconnect callback
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -17,6 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // On mount: check if user already has valid tokens (e.g., page refresh)
   useEffect(() => {
     const checkAuth = async () => {
       const tokens = getStoredTokens();
@@ -29,8 +32,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userData = await getUser(tokens.accessToken);
         setUser(userData);
         storeUserId(userData.username);
+        
+        // Reconnect WebSocket if tokens are valid
+        console.log('[AuthContext] Restored session, connecting WebSocket...');
+        connect(tokens.idToken).catch(console.error);
       } catch (err) {
-        console.error('Auth check failed:', err);
+        console.error('[AuthContext] Session validation failed:', err);
         clearTokens();
       } finally {
         setLoading(false);
@@ -40,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, []);
 
+  // Login handler: stores tokens and triggers WebSocket connection
   const handleSignIn = async (email: string, password: string) => {
     try {
       setError(null);
@@ -49,6 +57,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userData = await getUser(tokens.accessToken);
       setUser(userData);
       storeUserId(userData.username);
+      
+      // Connect WebSocket after successful login
+      console.log('[AuthContext] Login successful, connecting WebSocket...');
+      connect(tokens.idToken).catch(console.error);
     } catch (err: any) {
       setError(err.message || 'Sign in failed');
       throw err;

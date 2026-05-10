@@ -10,11 +10,42 @@ resource "aws_apigatewayv2_api" "websocket_api" {
   }
 }
 
+# API Gateway Account Settings for CloudWatch Logging
+resource "aws_api_gateway_account" "main" {
+  cloudwatch_role_arn = aws_iam_role.apigateway_logging.arn
+}
+
 # WebSocket API Stages
 resource "aws_apigatewayv2_stage" "websocket_stage" {
   api_id      = aws_apigatewayv2_api.websocket_api.id
   name        = "$default"
   auto_deploy = true
+
+  default_route_settings {
+    throttling_burst_limit = 1000
+    throttling_rate_limit   = 500
+  }
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.websocket_access_logs.arn
+    format = jsonencode({
+      requestId = "$context.requestId"
+      ip = "$context.identity.sourceIp"
+      caller = "$context.identity.caller"
+      user = "$context.identity.user"
+      requestTime = "$context.requestTime"
+      httpMethod = "$context.httpMethod"
+      resourcePath = "$context.resourcePath"
+      status = "$context.status"
+      protocol = "$context.protocol"
+      responseLength = "$context.responseLength"
+      routeKey = "$context.routeKey"
+      connectedAt = "$context.connectedAt"
+      connectionId = "$context.connectionId"
+    })
+  }
+
+  depends_on = [aws_api_gateway_account.main]
 
   tags = {
     Environment = var.environment
@@ -27,16 +58,17 @@ resource "aws_apigatewayv2_authorizer" "websocket_authorizer" {
   api_id           = aws_apigatewayv2_api.websocket_api.id
   authorizer_type  = "REQUEST"
   name             = "websocket-authorizer"
-  authorizer_uri   = aws_lambda_function.authorizer.arn
-  identity_sources = ["$request.header.Authorization"]
+  authorizer_uri   = "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${aws_lambda_function.authorizer.arn}/invocations"
+  identity_sources = ["route.request.header.Authorization", "route.request.querystring.Authorization"]
 }
 
 # WebSocket API Routes
 resource "aws_apigatewayv2_route" "connect_route" {
-  api_id         = aws_apigatewayv2_api.websocket_api.id
-  route_key      = "$connect"
-  target         = "integrations/${aws_apigatewayv2_integration.connect_integration.id}"
-  authorizer_id   = aws_apigatewayv2_authorizer.websocket_authorizer.id
+  api_id             = aws_apigatewayv2_api.websocket_api.id
+  route_key          = "$connect"
+  target             = "integrations/${aws_apigatewayv2_integration.connect_integration.id}"
+  authorizer_id      = aws_apigatewayv2_authorizer.websocket_authorizer.id
+  authorization_type = "CUSTOM"
 }
 
 resource "aws_apigatewayv2_route" "disconnect_route" {
@@ -95,10 +127,26 @@ resource "aws_lambda_permission" "allow_apigateway_message" {
   source_arn    = "${aws_apigatewayv2_api.websocket_api.execution_arn}/*/*"
 }
 
+resource "aws_lambda_permission" "allow_apigateway_authorizer" {
+  statement_id  = "AllowAPIGatewayAuthorizer"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.authorizer.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.websocket_api.execution_arn}/*/*"
+}
+
 # REST API for User Discovery
 resource "aws_apigatewayv2_api" "rest_api" {
   name          = var.rest_api_name
   protocol_type = "HTTP"
+
+  cors_configuration {
+    allow_origins = ["*"]
+    allow_methods = ["GET", "POST", "OPTIONS"]
+    allow_headers = ["Content-Type", "Authorization", "X-Requested-With"]
+    expose_headers = []
+    max_age = 3600
+  }
 
   tags = {
     Environment = var.environment
@@ -112,6 +160,30 @@ resource "aws_apigatewayv2_stage" "rest_stage" {
   name        = "$default"
   auto_deploy = true
 
+  default_route_settings {
+    throttling_burst_limit = 1000
+    throttling_rate_limit   = 500
+  }
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.rest_access_logs.arn
+    format = jsonencode({
+      requestId = "$context.requestId"
+      ip = "$context.identity.sourceIp"
+      caller = "$context.identity.caller"
+      user = "$context.identity.user"
+      requestTime = "$context.requestTime"
+      httpMethod = "$context.httpMethod"
+      resourcePath = "$context.resourcePath"
+      status = "$context.status"
+      protocol = "$context.protocol"
+      responseLength = "$context.responseLength"
+      integrationErrorMessage = "$context.integrationErrorMessage"
+    })
+  }
+
+  depends_on = [aws_api_gateway_account.main]
+
   tags = {
     Environment = var.environment
     Project     = var.project_name
@@ -123,6 +195,18 @@ resource "aws_apigatewayv2_route" "users_route" {
   api_id    = aws_apigatewayv2_api.rest_api.id
   route_key = "GET /users"
   target    = "integrations/${aws_apigatewayv2_integration.users_integration.id}"
+}
+
+resource "aws_apigatewayv2_route" "cors_preflight_users" {
+  api_id      = aws_apigatewayv2_api.rest_api.id
+  route_key   = "OPTIONS /users"
+  target      = "integrations/${aws_apigatewayv2_integration.users_integration.id}"
+}
+
+resource "aws_apigatewayv2_route" "cors_preflight" {
+  api_id      = aws_apigatewayv2_api.rest_api.id
+  route_key   = "OPTIONS /{proxy}"
+  target      = "integrations/${aws_apigatewayv2_integration.users_integration.id}"
 }
 
 # REST API Integration

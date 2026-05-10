@@ -1,5 +1,5 @@
-const WEBSOCKET_ENDPOINT = process.env.NEXT_PUBLIC_WEBSOCKET_ENDPOINT || '';
-const REST_API_ENDPOINT = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || '';
+const WEBSOCKET_ENDPOINT = process.env.NEXT_PUBLIC_WEBSOCKET_ENDPOINT?.replace(/\/$/, '') || '';
+const REST_API_ENDPOINT = process.env.NEXT_PUBLIC_REST_API_ENDPOINT?.replace(/\/$/, '') || '';
 
 let socket: WebSocket | null = null;
 let reconnectAttempts = 0;
@@ -34,25 +34,46 @@ export function connect(token: string): Promise<boolean> {
 
     notifyConnectionChange('connecting');
 
-    const wsUrl = `${WEBSOCKET_ENDPOINT}?Authorization=${encodeURIComponent(token)}`;
-    socket = new WebSocket(wsUrl);
+    // For WebSocket, API Gateway expects Authorization in the query string
+    // The route selection expression "$request.body.action" is for routing messages,
+    // but the $connect route is triggered by the WebSocket upgrade request
+    // Authorization is passed as a query parameter for the authorizer to validate
+    
+    // Ensure URL has stage ($default) if not already present
+    let wsEndpoint = WEBSOCKET_ENDPOINT;
+    if (!wsEndpoint.includes('/$default')) {
+      wsEndpoint = wsEndpoint.replace(/\/$/, '') + '/$default';
+    }
+    
+    const wsUrl = `${wsEndpoint}?Authorization=${encodeURIComponent(token)}`;
+    console.log('[WebSocket] Full URL being used:', wsUrl);
+    console.log('[WebSocket] Endpoint from config:', WEBSOCKET_ENDPOINT);
+    
+    // Create WebSocket connection
+    try {
+      socket = new WebSocket(wsUrl);
+    } catch (err) {
+      console.error('[WebSocket] Failed to create WebSocket:', err);
+      reject(err);
+      return;
+    }
 
     socket.onopen = () => {
-      console.log('WebSocket connected');
+      console.log('[WebSocket] Connected successfully');
       reconnectAttempts = 0;
       notifyConnectionChange('connected');
       resolve(true);
     };
 
     socket.onclose = (event) => {
-      console.log('WebSocket disconnected', event);
+      console.log('[WebSocket] Disconnected', event.code, event.reason);
       notifyConnectionChange('disconnected');
       socket = null;
 
       if (!event.wasClean && reconnectAttempts < maxReconnectAttempts) {
         reconnectAttempts++;
         const delay = reconnectDelay * Math.pow(2, reconnectAttempts - 1);
-        console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts})`);
+        console.log(`[WebSocket] Reconnecting in ${delay}ms (attempt ${reconnectAttempts})`);
         setTimeout(() => {
           connect(token).catch(console.error);
         }, delay);
@@ -60,7 +81,7 @@ export function connect(token: string): Promise<boolean> {
     };
 
     socket.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      console.error('[WebSocket] Error:', error);
       reject(error);
     };
 

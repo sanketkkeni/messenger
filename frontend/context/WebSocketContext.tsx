@@ -1,5 +1,20 @@
+/**
+ * WebSocketContext - Manages WebSocket connection state and message handling
+ * 
+ * This context provider:
+ * - Initializes WebSocket connection on mount when auth tokens are available
+ * - Listens for connection status changes and updates React state
+ * - Handles incoming messages and maintains message history
+ * - Provides connect/disconnect/sendMessage functions to child components
+ * 
+ * Token Flow:
+ * 1. Reads idToken from localStorage via getStoredTokens()
+ * 2. Passes token to connect() which adds it as query param to WebSocket URL
+ * 3. API Gateway authorizer validates the token before allowing $connect route
+ */
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { connect, disconnect, sendMessage, onMessage, onConnectionChange, isConnected, notifyMessage, notifyConnectionChange } from '../lib/websocket';
+import { connect, disconnect, sendMessage, onMessage, onConnectionChange } from '../lib/websocket';
 import { getStoredTokens } from '../lib/auth';
 
 interface Message {
@@ -20,40 +35,56 @@ interface WebSocketContextType {
 
 const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
 
+// Main provider component - wraps the app to provide WebSocket functionality
 export function WebSocketProvider({ children }: { children: ReactNode }) {
+  // connected: tracks WebSocket connection state (true/false)
+  // messages: stores all received messages for display
   const [connected, setConnected] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
 
+  // Initialize WebSocket connection on component mount
   useEffect(() => {
+    console.log('[WebSocketContext] Initializing...');
+    const tokens = getStoredTokens();
+    console.log('[WebSocketContext] Tokens available:', !!tokens?.idToken);
+
+    // Only connect if we have an idToken (set after successful login)
+    if (tokens?.idToken) {
+      console.log('[WebSocketContext] Calling connect with token...');
+      connect(tokens.idToken).catch(console.error);
+    }
+
+    // Register callback for connection status changes (connected/disconnected/connecting)
     const handleConnectionChange = (status: 'connected' | 'disconnected' | 'connecting') => {
+      console.log('[WebSocketContext] Connection status changed:', status);
       setConnected(status === 'connected');
     };
 
+    // Register callback for incoming messages from WebSocket
     const handleNewMessage = (data: Message) => {
       setMessages((prev) => [...prev, data]);
     };
 
+    // Register the callbacks with the websocket module
     onConnectionChange(handleConnectionChange);
     onMessage(handleNewMessage);
 
-    const tokens = getStoredTokens();
-    if (tokens?.idToken) {
-      connect(tokens.idToken).catch(console.error);
-    }
-
+    // Cleanup: disconnect when component unmounts or user leaves page
     return () => {
       disconnect();
     };
-  }, []);
+  }, []); // Empty deps array = runs once on mount
 
+  // Send a message via WebSocket to a specific recipient
   const handleSendMessage = (recipientId: string, text: string): boolean => {
     return sendMessage(recipientId, text);
   };
 
+  // Manual reconnect function (can be called from UI if needed)
   const handleConnect = async (): Promise<boolean> => {
     const tokens = getStoredTokens();
     if (!tokens?.idToken) {
-      console.error('No token available');
+      console.error('[WebSocketContext] No token available for connection');
       return false;
     }
 
@@ -61,16 +92,18 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       await connect(tokens.idToken);
       return true;
     } catch (error) {
-      console.error('Failed to connect:', error);
+      console.error('[WebSocketContext] Failed to connect:', error);
       return false;
     }
   };
 
+  // Manual disconnect function
   const handleDisconnect = () => {
     disconnect();
     setConnected(false);
   };
 
+  // Clear message history (e.g., when switching conversations)
   const clearMessages = () => {
     setMessages([]);
   };
@@ -91,6 +124,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Custom hook for consuming WebSocket context in components
+// Usage: const { connected, sendMessage } = useWebSocket();
 export function useWebSocket() {
   const context = useContext(WebSocketContext);
   if (context === undefined) {

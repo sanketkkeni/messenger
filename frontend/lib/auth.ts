@@ -1,4 +1,4 @@
-import { CognitoIdentityProviderClient, SignUpCommand, SignInCommand, GetUserCommand, InitiateAuthCommand, SignOutCommand, ConfirmSignUpCommand } from '@aws-sdk/client-cognito-identity-provider';
+import { CognitoIdentityProviderClient, SignUpCommand, GetUserCommand, InitiateAuthCommand, GlobalSignOutCommand, ConfirmSignUpCommand } from '@aws-sdk/client-cognito-identity-provider';
 
 const REGION = process.env.NEXT_PUBLIC_AWS_REGION || 'us-east-1';
 const USER_POOL_ID = process.env.NEXT_PUBLIC_USER_POOL_ID || '';
@@ -83,7 +83,7 @@ export async function getUser(accessToken: string): Promise<User> {
 }
 
 export async function signOut(accessToken: string): Promise<void> {
-  const command = new SignOutCommand({ AccessToken: accessToken });
+  const command = new GlobalSignOutCommand({ AccessToken: accessToken });
   await cognitoClient.send(command);
 }
 
