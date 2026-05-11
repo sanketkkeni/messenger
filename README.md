@@ -104,7 +104,8 @@ User opens app
 - [AGENTS.md](AGENTS.md) - Developer notes
 
 ### Technical Documentation
-- [technical_flow/](technical_flow/) - 21 in-depth technical documents covering architecture, AWS services, authentication, WebSocket, Lambda functions, DynamoDB, API Gateway, IAM, Cognito, CloudWatch, security, deployment, environment variables, troubleshooting, local development, cost estimation, and architecture diagrams
+- [technical_flow/](technical_flow/) - 21 in-depth technical documents
+- [technical_flow/architecture_diagram.md](technical_flow/architecture_diagram.md) - Visual Mermaid diagrams showing system architecture, flows, and Terraform-managed infrastructure
 
 ## License
 

@@ -1,66 +1,65 @@
 # High-Level Architecture Diagram
 
-This document contains a comprehensive Mermaid diagram of the Family Messenger system.
+This document contains comprehensive Mermaid diagrams of the Family Messenger system.
 
 ## System Architecture
 
 ```mermaid
-%%{init: {'theme': 'default', 'themeVariables': { 'primaryColor': '#4A90D9', 'primaryTextColor': '#fff', 'primaryBorderColor': '#2E5090', 'lineColor': '#666', 'secondaryColor': '#50A5E6', 'tertiaryColor': '#F0F4F8'}}}%%
 flowchart TB
-    subgraph CLIENT["👤 CLIENT LAYER"]
-        Browser[\"🌐 Browser\n(Next.js App)\"]
+    subgraph CLIENT["CLIENT LAYER"]
+        Browser["Browser<br/>(Next.js App)"]
     end
 
-    subgraph FRONTEND["📱 FRONTEND (Vercel)"]
-        VercelCDN["Vercel CDN\n(Static Assets)"]
+    subgraph FRONTEND["FRONTEND - Vercel"]
+        VercelCDN["Vercel CDN<br/>(Static Assets)"]
     end
 
-    subgraph AUTH["🔐 AUTHENTICATION (Cognito)"]
-        CognitoUserPool["Cognito User Pool\nus-east-1_tQ9N9Y8LF"]
-        CognitoClient["App Client\n6pbdutoj0p9bhrp2hia7qcflj6"]
+    subgraph AUTH["AUTHENTICATION - Cognito"]
+        CognitoUserPool["Cognito User Pool<br/>us-east-1_tQ9N9Y8LF"]
+        CognitoClient["App Client<br/>6pbdutoj0p9bhrp2hia7qcflj6"]
     end
 
-    subgraph BACKEND["⚙️ BACKEND (AWS Lambda + API Gateway) - Managed by Terraform"]
+    subgraph BACKEND["BACKEND - AWS Lambda + API Gateway<br/>(Managed by Terraform)"]
         subgraph APIGW["API Gateway"]
-            WebSocketAPI["WebSocket API\nID: 7477wqg01f"]
-            RESTAPI["REST API\nID: wka1crhece"]
+            WebSocketAPI["WebSocket API<br/>ID: 7477wqg01f"]
+            RESTAPI["REST API<br/>ID: wka1crhece"]
         end
 
         subgraph LAMBDA["Lambda Functions (Python 3.13)"]
-            Authorizer["authorizer\n(JWT Validation)"]
-            ConnectHandler["connect_handler\n(Store connection)"]
-            DisconnectHandler["disconnect_handler\n(Remove connection)"]
-            MessageHandler["message_handler\n(Route messages)"]
-            UsersHandler["users_handler\n(List users)"]
-            HistoryHandler["history_handler\n(Load history)"]
+            Authorizer["authorizer<br/>(JWT Validation)"]
+            ConnectHandler["connect_handler<br/>(Store connection)"]
+            DisconnectHandler["disconnect_handler<br/>(Remove connection)"]
+            MessageHandler["message_handler<br/>(Route messages)"]
+            UsersHandler["users_handler<br/>(List users)"]
+            HistoryHandler["history_handler<br/>(Load history)"]
         end
 
         subgraph IAM["IAM Roles"]
-            LambdaExecutionRole["Lambda Execution Role\n(Least privilege)"]
+            LambdaExecutionRole["Lambda Execution Role<br/>(Least privilege)"]
         end
     end
 
-    subgraph STORAGE["💾 DATA STORAGE (DynamoDB)"]
-        ConnectionsTable["connections\n(connectionId → userId)"]
-        MessagesTable["messages\n(conversationId, timestamp)"]
+    subgraph STORAGE["DATA STORAGE - DynamoDB"]
+        ConnectionsTable["connections<br/>(connectionId to userId)"]
+        MessagesTable["messages<br/>(conversationId, timestamp)"]
     end
 
-    subgraph MONITORING["📊 MONITORING (CloudWatch)"]
-        CloudWatchLogs["CloudWatch Logs\n(Lambda, API GW, Cognito)"]
-        CloudWatchDashboards["Dashboards\n(Lambda metrics, API usage)"]
+    subgraph MONITORING["MONITORING - CloudWatch"]
+        CloudWatchLogs["CloudWatch Logs<br/>(Lambda, API GW, Cognito)"]
+        CloudWatchDashboards["Dashboards<br/>(Lambda metrics, API usage)"]
     end
 
-    subgraph INFRA["🏗️ INFRASTRUCTURE (Terraform)"]
-        TerraformState["Terraform State\n(S3 Backend)"]
-        TerraformConfig["Terraform Config\n(infrastructure/)"]
+    subgraph INFRA["INFRASTRUCTURE - Terraform"]
+        TerraformState["Terraform State<br/>(S3 Backend)"]
+        TerraformConfig["Terraform Config<br/>(infrastructure/)"]
     end
 
-    Browser <-->|HTTPS/WSS| VercelCDN
-    VercelCDN <-->|Fetch assets| Browser
+    Browser <-.->|HTTPS/WSS| VercelCDN
+    VercelCDN <-.->|Fetch assets| Browser
 
     Browser -->|1. Sign up/Sign in| CognitoUserPool
     CognitoUserPool -->|2. Auth tokens| Browser
-    CognitoClient -->|Validate| CognitoUserPool
+    CognitoClient -.->|Validate| CognitoUserPool
 
     Browser -->|3. WSS Connect| WebSocketAPI
     WebSocketAPI -->|4. Invoke| Authorizer
@@ -86,31 +85,31 @@ flowchart TB
     RESTAPI -->|21. Route| UsersHandler
     UsersHandler -->|22. List users| CognitoUserPool
 
-    ConnectHandler -->|Logs| CloudWatchLogs
-    DisconnectHandler -->|Logs| CloudWatchLogs
-    MessageHandler -->|Logs| CloudWatchLogs
-    UsersHandler -->|Logs| CloudWatchLogs
-    HistoryHandler -->|Logs| CloudWatchLogs
-    WebSocketAPI -->|Logs| CloudWatchLogs
-    RESTAPI -->|Logs| CloudWatchLogs
+    ConnectHandler -.->|Logs| CloudWatchLogs
+    DisconnectHandler -.->|Logs| CloudWatchLogs
+    MessageHandler -.->|Logs| CloudWatchLogs
+    UsersHandler -.->|Logs| CloudWatchLogs
+    HistoryHandler -.->|Logs| CloudWatchLogs
+    WebSocketAPI -.->|Logs| CloudWatchLogs
+    RESTAPI -.->|Logs| CloudWatchLogs
 
-    TerraformConfig -->|Apply| APIGW
-    TerraformConfig -->|Apply| LAMBDA
-    TerraformConfig -->|Apply| ConnectionsTable
-    TerraformConfig -->|Apply| MessagesTable
-    TerraformConfig -->|Apply| CognitoUserPool
-    TerraformConfig -->|Apply| CloudWatchLogs
-    TerraformConfig -->|State| TerraformState
+    TerraformConfig -.->|Apply| APIGW
+    TerraformConfig -.->|Apply| LAMBDA
+    TerraformConfig -.->|Apply| ConnectionsTable
+    TerraformConfig -.->|Apply| MessagesTable
+    TerraformConfig -.->|Apply| CognitoUserPool
+    TerraformConfig -.->|Apply| CloudWatchLogs
+    TerraformConfig -.->|State| TerraformState
 ```
 
 ## User Authentication Flow
 
 ```mermaid
 sequenceDiagram
-    participant User as 👤 User
-    participant Frontend as 📱 Next.js
-    participant Cognito as 🔐 Cognito\n(User Pool)
-    participant DynamoDB as 💾 DynamoDB\n(connections)
+    participant User as User
+    participant Frontend as Next.js
+    participant Cognito as Cognito (User Pool)
+    participant DynamoDB as DynamoDB (connections)
 
     User->>Frontend: 1. Click Sign Up
     Frontend->>Cognito: 2. SignUp(email, password)
@@ -132,13 +131,13 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant Browser as 🌐 Browser
-    participant APIGW as 🌐 API Gateway\nWebSocket
-    participant Authorizer as λ authorizer
-    participant Cognito as 🔐 Cognito
-    participant DynamoDB as 💾 DynamoDB\n(connections)
+    participant Browser as Browser
+    participant APIGW as API Gateway WebSocket
+    participant Authorizer as Lambda authorizer
+    participant Cognito as Cognito
+    participant DynamoDB as DynamoDB (connections)
 
-    Browser->>APIGW: 1. WSS Connect\nwss://...?Authorization=<jwt>
+    Browser->>APIGW: 1. WSS Connect with JWT token
     APIGW->>Authorizer: 2. Invoke with JWT token
     Authorizer->>Authorizer: 3. Decode JWT
     Authorizer->>Cognito: 4. Validate token signature
@@ -154,22 +153,22 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant Sender as 👤 Sender\n(User A)
-    participant APIGW as 🌐 API Gateway\nWebSocket
-    participant Lambda as λ message_handler
-    participant DynamoDB as 💾 DynamoDB
-    participant Receiver as 👤 Receiver\n(User B)
+    participant Sender as Sender (User A)
+    participant APIGW as API Gateway WebSocket
+    participant Lambda as Lambda message_handler
+    participant DynamoDB as DynamoDB
+    participant Receiver as Receiver (User B)
 
-    Sender->>APIGW: 1. WSS Send\n{"action": "sendMessage", "receiverId": "user-b", "message": "Hi!"}
+    Sender->>APIGW: 1. WSS Send message
     APIGW->>Lambda: 2. Invoke message_handler
     Lambda->>Lambda: 3. Parse request
     Lambda->>Lambda: 4. Generate messageId (UUID)
-    Lambda->>DynamoDB: 5. Query connections where userId = "user-b"
+    Lambda->>DynamoDB: 5. Query connections where userId = user-b
     DynamoDB-->>Lambda: 6. Return connectionId(s)
-    Lambda->>DynamoDB: 7. PutItem(messageId, conversationId, timestamp, senderId, receiverId, message)
+    Lambda->>DynamoDB: 7. PutItem(message record)
     DynamoDB-->>Lambda: 8. Message stored
-    Lambda->>APIGW: 9. PostToConnection(connectionId, message payload)
-    APIGW-->>Sender: 10. SendResult {"success": true}
+    Lambda->>APIGW: 9. PostToConnection(connectionId, payload)
+    APIGW-->>Sender: 10. SendResult success
     APIGW->>Receiver: 11. Push message via WebSocket
     Receiver-->>APIGW: 12. Acknowledge
 ```
@@ -178,20 +177,20 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant Browser as 🌐 Browser
-    participant REST as 🌐 API Gateway\nREST
-    participant Lambda as λ history_handler
-    participant DynamoDB as 💾 DynamoDB\n(messages)
+    participant Browser as Browser
+    participant REST as API Gateway REST
+    participant Lambda as Lambda history_handler
+    participant DynamoDB as DynamoDB (messages)
 
-    Browser->>REST: 1. GET /conversations/{conversationId}/messages
+    Browser->>REST: 1. GET /conversations/{id}/messages
     REST->>Lambda: 2. Invoke history_handler
-    Lambda->>Lambda: 3. Get userId from JWT (via API GW authorizer)
-    Lambda->>Lambda: 4. Validate user has access to conversation
-    Lambda->>DynamoDB: 5. Query messages where conversationId = "user-a|user-b"
+    Lambda->>Lambda: 3. Get userId from JWT
+    Lambda->>Lambda: 4. Validate access to conversation
+    Lambda->>DynamoDB: 5. Query messages for conversation
     Note over Lambda,DynamoDB: Sorted by timestamp ascending
-    DynamoDB-->>Lambda: 6. Return messages (messageId, senderId, message, timestamp)
-    Lambda->>Lambda: 7. Convert Decimal types to int (JSON serialization)
-    Lambda-->>REST: 8. Return {"messages": [...]}
+    DynamoDB-->>Lambda: 6. Return messages
+    Lambda->>Lambda: 7. Convert Decimal types to int
+    Lambda-->>REST: 8. Return messages JSON
     REST-->>Browser: 9. JSON response with chat history
     Note over Browser: Chat UI displays message list
 ```
@@ -208,15 +207,15 @@ erDiagram
     }
 
     messages {
-        string conversationId PK "user-a|user-b (alphabetical)"
-        number timestamp SK "Unix timestamp (sort key)"
-        string messageId "UUID"
-        string senderId "Sending user's ID"
-        string receiverId "Receiving user's ID"
+        string conversationId PK "user-a|user-b sorted"
+        number timestamp SK "Unix timestamp"
+        string messageId "UUID primary key"
+        string senderId "Sending user ID"
+        string receiverId "Receiving user ID"
         string message "Message content"
     }
 
-    connections ||--o{ messages : "stores history for"
+    connections ||--o{ messages : stores
 ```
 
 ## Infrastructure (Terraform-managed Resources)
@@ -224,29 +223,29 @@ erDiagram
 ```mermaid
 flowchart TB
     subgraph TERRAFORM["Terraform Configuration (infrastructure/)"]
-        main_tf["main.tf\n(Provider, backend)"]
+        main_tf["main.tf (Provider, backend)"]
         variables_tf["variables.tf"]
         outputs_tf["outputs.tf"]
-        dynamodb_tf["dynamodb.tf\n(Tables, GSI)"]
-        cognito_tf["cognito.tf\n(User pool, client)"]
-        lambda_tf["lambda.tf\n(Functions, IAM)"]
-        api_gateway_tf["api_gateway.tf\n(WebSocket, REST, routes)"]
-        cloudwatch_tf["cloudwatch.tf\n(Log groups, dashboards)"]
+        dynamodb_tf["dynamodb.tf (Tables, GSI)"]
+        cognito_tf["cognito.tf (User pool, client)"]
+        lambda_tf["lambda.tf (Functions, IAM)"]
+        api_gateway_tf["api_gateway.tf (WebSocket, REST, routes)"]
+        cloudwatch_tf["cloudwatch.tf (Log groups, dashboards)"]
     end
 
     subgraph APPLIED["AWS Resources (Deployed via Terraform)"]
         direction LR
-        DDB["DynamoDB\n- connections\n- messages"] 
-        COG["Cognito\n- User Pool\n- App Client"]
-        LAMBDA["Lambda\n- authorizer\n- connect_handler\n- disconnect_handler\n- message_handler\n- users_handler\n- history_handler"]
-        APIGW["API Gateway\n- WebSocket API\n- REST API"]
-        CW["CloudWatch\n- Log Groups\n- Dashboards"]
-        IAM["IAM\n- Lambda execution role\n- API GW logs role"]
+        DDB["DynamoDB<br/>- connections<br/>- messages"]
+        COG["Cognito<br/>- User Pool<br/>- App Client"]
+        LAMBDA["Lambda<br/>- authorizer<br/>- connect_handler<br/>- disconnect_handler<br/>- message_handler<br/>- users_handler<br/>- history_handler"]
+        APIGW["API Gateway<br/>- WebSocket API<br/>- REST API"]
+        CW["CloudWatch<br/>- Log Groups<br/>- Dashboards"]
+        IAM["IAM<br/>- Lambda execution role<br/>- API GW logs role"]
     end
 
     subgraph DEPLOY["Deployment Workflow"]
-        Local["Local Machine\n(Terraform apply)"]
-        AWS["AWS Cloud\n(Resources created)"]
+        Local["Local Machine<br/>(Terraform apply)"]
+        AWS["AWS Cloud<br/>(Resources created)"]
     end
 
     main_tf -->|Defines| variables_tf
@@ -277,16 +276,16 @@ flowchart LR
     end
 
     subgraph FRONTEND_DEPLOY["Frontend (Vercel)"]
-        VercelBuild["Vercel Build\n(npm install, npm run build)"]
-        VercelDeploy["Vercel Deploy\n(Automatic on push)"]
-        VercelCDN["Vercel CDN\n(Global edge network)"]
+        VercelBuild["Vercel Build<br/>(npm install, build)"]
+        VercelDeploy["Vercel Deploy<br/>(Automatic on push)"]
+        VercelCDN["Vercel CDN<br/>(Global edge network)"]
     end
 
     subgraph BACKEND_DEPLOY["Backend (AWS - Terraform)"]
         TerraformInit["terraform init"]
         TerraformPlan["terraform plan"]
         TerraformApply["terraform apply"]
-        LambdaUpdate["Lambda Code Update\n(zip + aws cli)"]
+        LambdaUpdate["Lambda Code Update<br/>(zip + aws cli)"]
     end
 
     subgraph RESOURCES["AWS Resources"]
@@ -310,28 +309,28 @@ flowchart LR
     LambdaUpdate -->|Deploy| LambdaFunc
 ```
 
-## Environment & Configuration
+## Environment Configuration
 
 ```mermaid
 flowchart TB
-    subgraph FRONTEND_ENV["Frontend (Vercel - Environment Variables)"]
-        API_URL["NEXT_PUBLIC_API_URL\nhttps://wka1crhece.execute-api.us-east-1.amazonaws.com"]
-        WS_URL["NEXT_PUBLIC_WEBSOCKET_URL\nwss://7477wqg01f.execute-api.us-east-1.amazonaws.com/\\$default"]
-        COGNITO_CLIENT["NEXT_PUBLIC_COGNITO_CLIENT_ID\n6pbdutoj0p9bhrp2hia7qcflj6"]
-        COGNITO_POOL["NEXT_PUBLIC_COGNITO_USER_POOL_ID\nus-east-1_tQ9N9Y8LF"]
-        REGION["NEXT_PUBLIC_COGNITO_REGION\nus-east-1"]
+    subgraph FRONTEND_ENV["Frontend (Vercel)"]
+        API_URL["NEXT_PUBLIC_API_URL<br/>https://wka1crhece.execute-api.us-east-1.amazonaws.com"]
+        WS_URL["NEXT_PUBLIC_WEBSOCKET_URL<br/>wss://7477wqg01f.execute-api.us-east-1.amazonaws.com/$default"]
+        COGNITO_CLIENT["NEXT_PUBLIC_COGNITO_CLIENT_ID<br/>6pbdutoj0p9bhrp2hia7qcflj6"]
+        COGNITO_POOL["NEXT_PUBLIC_COGNITO_USER_POOL_ID<br/>us-east-1_tQ9N9Y8LF"]
+        REGION["NEXT_PUBLIC_COGNITO_REGION<br/>us-east-1"]
     end
 
-    subgraph BACKEND_ENV["Backend (Lambda - Environment Variables)"]
-        DDB_MESSAGES["DYNAMODB_TABLE_MESSAGES\nfamily-messenger-messages"]
-        DDB_CONNECTIONS["DYNAMODB_TABLE_CONNECTIONS\nfamily-messenger-connections"]
-        AWS_REGION["AWS_REGION\nus-east-1"]
+    subgraph BACKEND_ENV["Backend (Lambda)"]
+        DDB_MESSAGES["DYNAMODB_TABLE_MESSAGES<br/>family-messenger-messages"]
+        DDB_CONNECTIONS["DYNAMODB_TABLE_CONNECTIONS<br/>family-messenger-connections"]
+        AWS_REGION["AWS_REGION<br/>us-east-1"]
     end
 
     subgraph SECRETS["Security"]
-        JWT_SECRET["JWT Secret\n(Cognito public keys)"]
-        HTTPS["HTTPS/WSS\n(Always encrypted)"]
-        HttpOnly["HttpOnly Cookies\n(Token storage)"]
+        JWT_SECRET["JWT Secret (Cognito public keys)"]
+        HTTPS["HTTPS/WSS (Always encrypted)"]
+        HttpOnly["HttpOnly Cookies (Token storage)"]
     end
 ```
 

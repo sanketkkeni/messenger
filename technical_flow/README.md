@@ -37,6 +37,9 @@ This directory contains in-depth technical documentation for the Family Messenge
 20. [Cost Estimation](20_cost_estimation.md) - AWS cost breakdown
 21. [Architecture Diagrams](21_architecture_diagrams.md) - ASCII system diagrams
 
+### Visual Architecture
+[architecture_diagram.md](architecture_diagram.md) - Mermaid-based visual diagrams showing system architecture, authentication flows, messaging flows, data models, Terraform infrastructure, and deployment workflows (GitHub renders Mermaid diagrams automatically)
+
 ## Quick Reference
 
 ### Resource Names
