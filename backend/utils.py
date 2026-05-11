@@ -3,7 +3,7 @@ import json
 import base64
 import boto3
 import time
-from botocore.exceptions import ClientError
+from boto3.dynamodb.conditions import Key, Attr
 
 # Initialize AWS clients
 dynamodb = boto3.resource('dynamodb')
@@ -94,19 +94,26 @@ def delete_connection(connection_id):
     """Delete a specific connection"""
     try:
         if not connections_table:
+            print("ERROR: connections_table not initialized")
             return False
         
-        # First find the item to get the UserId (since we need both PK and SK)
+        print(f"DEBUG delete_connection: looking for connectionId={connection_id}")
+        
+        # Use KeyConditionExpression for the RANGE key
         response = connections_table.scan(
-            FilterExpression=boto3.dynamodb.conditions.Key('connectionId').eq(connection_id)
+            KeyConditionExpression=Key('connectionId').eq(connection_id)
         )
         
         items = response.get('Items', [])
+        print(f"DEBUG delete_connection: found {len(items)} items")
+        
         if not items:
+            print(f"DEBUG delete_connection: no connection found for {connection_id}")
             return True  # Nothing to delete
         
         # Delete each matching item (should be only one)
         for item in items:
+            print(f"DEBUG delete_connection: deleting userId={item.get('UserId')}, connectionId={item.get('connectionId')}")
             connections_table.delete_item(
                 Key={
                     'UserId': item['UserId'],

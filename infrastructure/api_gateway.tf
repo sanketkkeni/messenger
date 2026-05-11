@@ -54,12 +54,15 @@ resource "aws_apigatewayv2_stage" "websocket_stage" {
 }
 
 # WebSocket API Authorizer
+# NOTE: For WebSocket APIs, identity_sources MUST only use route.request.querystring.Authorization
+# Using both header and query string causes 401 because WebSocket upgrade requests
+# cannot easily set custom headers. Only query string is supported for $connect auth.
 resource "aws_apigatewayv2_authorizer" "websocket_authorizer" {
   api_id           = aws_apigatewayv2_api.websocket_api.id
   authorizer_type  = "REQUEST"
   name             = "websocket-authorizer"
   authorizer_uri   = "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${aws_lambda_function.authorizer.arn}/invocations"
-  identity_sources = ["route.request.header.Authorization", "route.request.querystring.Authorization"]
+  identity_sources = ["route.request.querystring.Authorization"]
 }
 
 # WebSocket API Routes
@@ -67,9 +70,8 @@ resource "aws_apigatewayv2_route" "connect_route" {
   api_id             = aws_apigatewayv2_api.websocket_api.id
   route_key          = "$connect"
   target             = "integrations/${aws_apigatewayv2_integration.connect_integration.id}"
-  # AuthorizationType set to NONE - token validation handled by connect_handler Lambda
-  # See WIKI.md for details on why authorizer is bypassed
-  authorization_type = "NONE"
+  authorization_type = "CUSTOM"
+  authorizer_id      = aws_apigatewayv2_authorizer.websocket_authorizer.id
 }
 
 resource "aws_apigatewayv2_route" "disconnect_route" {

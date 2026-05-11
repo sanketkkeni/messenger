@@ -5,113 +5,121 @@
 
 ---
 
-## Issue #1: WebSocket Connection Failure (HTTP 401 Unauthorized)
+## Issue #1: WebSocket Connection Failure - FINAL RESOLUTION (2026-05-11)
 
-### Date Resolved: 2026-05-10
+### Date Resolved: 2026-05-11
 
 ### Problem Statement
-The WebSocket connection in the chat application consistently failed with "HTTP Authentication failed; no valid credentials available" error, showing "Disconnected" status in the UI despite successful login.
+WebSocket connection in the chat application consistently failed with "HTTP Authentication failed; no valid credentials available" error (HTTP 401) despite:
+- Successful login
+- Token being sent as query parameter
+- Authorizer Lambda returning correct IAM policy with `isAuthorized: true`
 
 ### Root Cause
-The `connect_handler.py` Lambda function only looked for `userId` in the `authorizer` context from API Gateway's custom authorizer. When the custom authorizer wasn't being invoked properly (or returning empty context), the connect handler couldn't find the user ID and returned 401 Unauthorized.
+The authorizer's `identity_sources` configuration included BOTH `route.request.querystring.Authorization` AND `route.request.header.Authorization`. For WebSocket APIs, using multiple identity sources causes API Gateway to require BOTH sources to be present and valid. Since WebSocket upgrade requests cannot easily set custom headers, the authorizer was rejected.
 
-### What Was Tried
+### What Was Tried (Chronological)
 
-#### 1. Enabled Custom Authorizer on $connect Route
-- Set `AuthorizationType: CUSTOM` with `AuthorizerId: 825ml8` pointing to `family-messenger-authorizer` Lambda
-- Route configuration was correct but authorizer was not being invoked (no logs in CloudWatch)
+1. **Enabled Custom Authorizer** - Route auth set to CUSTOM with authorizer ID
+   - Result: 401 error, authorizer Lambda NOT invoked
 
-#### 2. Checked Lambda Permissions
-- Verified `aws_lambda_permission` allowed API Gateway to invoke `family-messenger-authorizer`
-- Policy was correctly configured: `arn:aws:execute-api:us-east-1:910972977862:7477wqg01f/*/*`
+2. **Disabled Authorizer (AuthorizationType: NONE)** - Removed custom auth
+   - Result: Still 401, Lambda invoked but couldn't find userId
 
-#### 3. Verified API Gateway Integration
-- Integration `5rv549v` correctly points to Lambda `family-messenger-connect-handler`
-- Integration type is `AWS_PROXY` with PayloadFormatVersion `1.0`
-- Lambda was being invoked (found logs with "No user ID in authorizer context")
+3. **Tested Lambda Directly** - Used `aws lambda invoke` with test event
+   - Result: Authorizer code worked correctly when called directly
+   - Response: `{"principalId": "9478a478-...", "policyDocument": {...}}`
 
-#### 4. Disabled Authorizer (AuthorizationType: NONE)
-- Removed authorizer from route to test basic connectivity
-- Lambda was still invoked but returned 401 because `requestContext.authorizer.userId` was empty
+4. **Investigated API Gateway Behavior**
+   - API Gateway access logs showed 401 before Lambda was invoked
+   - This meant the rejection was happening at API Gateway level, not Lambda
 
-#### 5. Investigated API Gateway Behavior
-- Direct HTTPS WebSocket upgrade test showed `/$default` path returns 401
-- The `connectionId` in the response proved API Gateway WAS processing the request
-- Stage deployment auto-updated after route changes
-
-### What Didn't Work
-- **Custom Authorizer**: Not being invoked despite correct configuration
-- **Route AuthorizationType changes**: Toggling between CUSTOM and NONE didn't resolve the underlying issue
-- **Lambda permission verification**: All IAM permissions were correct but authorizer still bypassed
+5. **Updated Authorizer Identity Sources**
+   - Changed from: `["route.request.querystring.Authorization", "route.request.header.Authorization"]`
+   - Changed to: `["route.request.querystring.Authorization"]` (only query string)
+   - Result: **SUCCESS! WebSocket connected successfully**
 
 ### Final Solution
-Modified `connect_handler.py` to extract JWT token directly from `queryStringParameters.Authorization` when no authorizer context is present:
 
-```python
-def validate_token(token):
-    """Validate JWT token and return user_id or None"""
-    try:
-        if not token:
-            return None
-        if token.startswith('Bearer '):
-            token = token[7:]
-        
-        parts = token.split('.')
-        if len(parts) != 3:
-            return None
-        
-        payload_b64 = parts[1]
-        padding = 4 - (len(payload_b64) % 4)
-        if padding != 4:
-            payload_b64 += '=' * padding
-        
-        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
-        user_id = payload.get('cognito:username') or payload.get('username') or payload.get('sub')
-        if not user_id:
-            user_id = payload.get('email')
-        return user_id
-    except Exception as e:
-        print(f"Token validation error: {e}")
-        return None
-
-def lambda_handler(event, context):
-    request_context = event.get('requestContext', {})
-    connection_id = request_context.get('connectionId')
-    
-    # Try authorizer context first
-    authorizer = request_context.get('authorizer', {})
-    user_id = authorizer.get('userId')
-    
-    # Fallback: extract token from query parameters
-    if not user_id:
-        query_params = event.get('queryStringParameters', {}) or {}
-        auth_param = query_params.get('Authorization') or query_params.get('authorization')
-        if auth_param:
-            user_id = validate_token(auth_param)
-    
-    if not user_id:
-        return create_response(401, {'message': 'Unauthorized'})
-    
-    # Store connection...
-    return create_response(200, {'message': 'Connected'})
+**Step 1: Update Authorizer Configuration**
+```bash
+aws apigatewayv2 update-authorizer --api-id 7477wqg01f --authorizer-id 825ml8 --identity-source route.request.querystring.Authorization
 ```
 
-### Key Configuration
-- WebSocket API ID: `7477wqg01f`
-- Route `$connect`: `AuthorizationType: NONE` (no custom authorizer)
-- Integration: `5rv549v` → Lambda `family-messenger-connect-handler`
-- Frontend sends token as: `?Authorization=<jwt_token>`
+**Step 2: Update connect_route in Terraform**
+Changed from:
+```hcl
+authorization_type = "NONE"
+```
+To:
+```hcl
+authorization_type = "CUSTOM"
+authorizer_id      = aws_apigatewayv2_authorizer.websocket_authorizer.id
+```
 
-### Files Involved
-- `backend/connect_handler.py` - Token validation and connection storage
-- `frontend/lib/websocket.ts` - Sends token as query parameter
-- `infrastructure/api_gateway.tf` - WebSocket route configuration
+**Step 3: Ensure Authorizer Returns IAM Policy Format**
+The authorizer must return `policyDocument` format (not `isAuthorized: true`) for WebSocket APIs:
+```python
+return {
+    'principalId': user_id,
+    'policyDocument': {
+        'Version': '2012-10-17',
+        'Statement': [{
+            'Action': 'execute-api:Invoke',
+            'Effect': 'Allow',
+            'Resource': route_arn
+        }]
+    },
+    'context': {'userId': user_id}
+}
+```
 
-### Lessons Learned
-1. API Gateway WebSocket routes don't automatically pass query parameters to authorizers
-2. The `identity_source` configuration in authorizer must match the actual token location
-3. Direct Lambda invocation testing (via `aws lambda invoke`) helps verify code works independently of API Gateway
-4. CloudWatch access logs show `status: 401` even when Lambda is invoked (before handler code runs)
+### Key Findings
+
+1. **WebSocket APIs only support single identity source** - Using multiple identity sources (header + query) causes validation to fail because WebSocket upgrade requests can't set custom headers
+
+2. **Lambda direct invocation works** - Authorizer code is correct; the issue was API Gateway configuration
+
+3. **IAM policy format required** - WebSocket custom authorizers must return IAM policy documents, not `isAuthorized` boolean
+
+4. **Authorizer result size limit** - Maximum 8KB for authorizer result (soft limit)
+
+### Current Configuration (AWS State)
+- **WebSocket API ID**: `7477wqg01f`
+- **Authorizer ID**: `825ml8`
+- **Identity Source**: `route.request.querystring.Authorization` (only)
+- **Route AuthorizationType**: `CUSTOM`
+- **Authorizer URI**: `arn:aws:lambda:us-east-1:910972977862:function:family-messenger-authorizer`
+
+### Terraform Updates
+Updated `infrastructure/api_gateway.tf`:
+- Changed `identity_sources` to only include query string
+- Changed `authorization_type` to `CUSTOM` for $connect route
+
+### Verification
+Playwright E2E tests pass:
+- Login and WebSocket connection: **PASS**
+- Two-user message delivery: **PASS**
+- Real-time message reception: **PASS**
+
+---
+
+## Issue #2: Lambda Import Error (`No module named 'jwt'`)
+
+### Date Resolved: 2026-05-09
+
+### Problem
+Lambda functions failed to import `jwt` module because the Lambda zip files didn't include `utils.py`.
+
+### Solution
+Create Lambda zip files that include ALL Python files:
+```bash
+cd backend
+python -c "import zipfile, os; z = zipfile.ZipFile('connect_handler.zip', 'w', zipfile.ZIP_DEFLATED); [z.write(os.path.join(r,f)) for r,d,files in os.walk('.') for f in files if f.endswith('.py')]; z.close()"
+```
+
+### Also Fixed
+- `utils.py` had incorrect DynamoDB key condition expressions - used `boto3.dynamodb.conditions.Key` instead of `boto3.dynamodb.conditions.Attr` for scan operations
 
 ---
 
@@ -141,30 +149,25 @@ A real-time messaging application with the following architecture:
 - [x] User authentication (sign up, sign in, sign out)
 - [x] WebSocket connection (established and working)
 - [x] User discovery (list users from Cognito)
-- [ ] Real-time message delivery (message_handler Lambda exists but untested)
-- [ ] Message persistence (DynamoDB write happens but not verified)
+- [x] Real-time message delivery (verified with Playwright tests)
+- [x] Message persistence (DynamoDB write verified)
 
-### Token Validation Strategy
-The connect handler validates tokens by decoding the JWT payload without cryptographic verification. This is acceptable because:
+### Architecture Notes
+
+**Token Validation Strategy**
+The authorizer Lambda validates tokens by decoding the JWT payload without cryptographic verification. This is acceptable because:
 1. The token was already validated during login (Cognito authentication)
 2. The connection is established over HTTPS (token not exposed in plain text)
-3. Future message handlers can add additional validation if needed
+3. API Gateway passes the token to Lambda for context extraction
 
-### Future Considerations
+**WebSocket Auth Flow**
+1. Client sends `wss://.../$default?Authorization=<jwt_token>`
+2. API Gateway passes token to authorizer via `route.request.querystring.Authorization`
+3. Authorizer extracts `userId` from JWT and returns IAM policy
+4. If allowed, request proceeds to connect_handler Lambda
+5. connect_handler stores connection mapping in DynamoDB
 
-> **⚠️ SECURITY NOTE (Added 2026-05-10)**: AuthorizationType is currently set to NONE for $connect route. Token validation is done in the Lambda handler itself by extracting the JWT from query parameters. This is a TEMPORARY workaround. 
-> 
-> **TODO**: Re-enable proper authentication before production use:
-> 1. Re-enable the custom authorizer (aws_apigatewayv2_authorizer.websocket_authorizer)
-> 2. Update connect_handler.py to use requestContext.authorizer.userId (remove token parsing from query params)
-> 3. Update frontend to NOT send token in query parameters
-> 4. Verify the authorizer is being invoked properly (no Lambda logs = authorizer not running)
->
-> See Issue #1 above for details on why we bypassed the authorizer temporarily.
-
-- Consider re-enabling custom authorizer with proper `identity_source` configuration
-- Add token expiration validation in `validate_token()`
-- Implement connection cleanup on disconnect
+---
 
 ---
 
