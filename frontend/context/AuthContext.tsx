@@ -19,7 +19,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { signIn, signUp, getUser, storeTokens, clearTokens, getStoredTokens, storeUserId, getStoredUserId, User } from '../lib/auth';
+import { signIn, signUp, getUser, storeTokens, clearTokens, getStoredTokens, storeUserId, getStoredUserId, refreshTokens, User } from '../lib/auth';
 import { connect } from '../lib/websocket';
 
 // Context type definition
@@ -63,16 +63,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        // Validate tokens by fetching user data
         const userData = await getUser(tokens.accessToken);
         setUser(userData);
         storeUserId(userData.username);
-        
-        // Reconnect WebSocket on session restore
         connect(tokens.idToken).catch(console.error);
-      } catch (err) {
-        // Tokens invalid or expired, clear them
-        clearTokens();
+      } catch {
+        try {
+          const newTokens = await refreshTokens(tokens.refreshToken);
+          storeTokens(newTokens.accessToken, newTokens.idToken, newTokens.refreshToken);
+          const userData = await getUser(newTokens.accessToken);
+          setUser(userData);
+          storeUserId(userData.username);
+          connect(newTokens.idToken).catch(console.error);
+        } catch {
+          clearTokens();
+        }
       } finally {
         setLoading(false);
       }

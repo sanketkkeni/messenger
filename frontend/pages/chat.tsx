@@ -39,7 +39,7 @@ interface Message {
 
 /**
  * Generate a consistent conversation ID from two user IDs
- * 
+ *
  * The ID is deterministic regardless of which user initiates the conversation.
  * Format: "smallerId#largerId"
  */
@@ -50,7 +50,7 @@ const getConversationId = (user1: string, user2: string): string => {
 
 /**
  * Chat Page Component
- * 
+ *
  * Main layout:
  * - Header: App title, connection status, user info, sign out button
  * - Sidebar: List of contacts/users
@@ -58,9 +58,9 @@ const getConversationId = (user1: string, user2: string): string => {
  */
 export default function Chat() {
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading: authLoading } = useAuth();
   const { connected, sendMessage, messages, setMessages } = useWebSocket();
-  
+
   // User list state
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -68,8 +68,10 @@ export default function Chat() {
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated (but wait for auth check to complete)
   useEffect(() => {
+    if (authLoading) return;
+
     if (!user) {
       router.push('/login');
       return;
@@ -90,7 +92,7 @@ export default function Chat() {
     };
 
     loadUsers();
-  }, [user, router]);
+  }, [user, authLoading, router]);
 
   /**
    * Send message to the selected user

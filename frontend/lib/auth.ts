@@ -149,6 +149,30 @@ export async function signOut(accessToken: string): Promise<void> {
   await cognitoClient.send(command);
 }
 
+/**
+ * Refresh authentication tokens using refresh token
+ * 
+ * @param refreshToken - Valid refresh token from signIn
+ * @returns Object containing new accessToken, idToken, and refreshToken
+ */
+export async function refreshTokens(refreshToken: string): Promise<{ accessToken: string; idToken: string; refreshToken: string }> {
+  const command = new InitiateAuthCommand({
+    ClientId: CLIENT_ID,
+    AuthFlow: 'REFRESH_TOKEN_AUTH',
+    AuthParameters: {
+      REFRESH_TOKEN: refreshToken,
+    },
+  });
+
+  const response = await cognitoClient.send(command);
+
+  return {
+    accessToken: response.AuthenticationResult?.AccessToken || '',
+    idToken: response.AuthenticationResult?.IdToken || '',
+    refreshToken: response.AuthenticationResult?.RefreshToken || refreshToken,
+  };
+}
+
 // ==================== Token Storage (Client-Side) ====================
 // These functions manage authentication tokens in browser localStorage
 
