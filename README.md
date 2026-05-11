@@ -59,7 +59,11 @@ A private, real-time messaging app for family members. Send messages instantly, 
 
 ## Who Has Access?
 
-Currently, only family members with approved accounts can join. To add a new member, ask the account owner to create an account for them in Cognito (AWS).
+Anyone with a valid email address can create an account:
+1. Go to the app and click "Get Started"
+2. Enter your email and create a password
+3. Verify your email with the code sent to your inbox
+4. Start chatting with family members
 
 ## Architecture (High-Level)
 
