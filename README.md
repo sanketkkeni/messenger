@@ -98,9 +98,13 @@ User opens app
 
 ## Documentation
 
+### User Documentation
 - [WIKI.md](WIKI.md) - Debugging guide and issues resolved
 - [PLAN.md](PLAN.md) - Implementation plan and milestones
 - [AGENTS.md](AGENTS.md) - Developer notes
+
+### Technical Documentation
+- [technical_flow/](technical_flow/) - 21 in-depth technical documents covering architecture, AWS services, authentication, WebSocket, Lambda functions, DynamoDB, API Gateway, IAM, Cognito, CloudWatch, security, deployment, environment variables, troubleshooting, local development, cost estimation, and architecture diagrams
 
 ## License
 
