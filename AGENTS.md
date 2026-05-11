@@ -1,7 +1,5 @@
 # Agent Rules - Serverless Messaging Project
 
-<!-- dummy commit to verify git email -->
-
 ## General Guidelines
 - **ALWAYS ask a follow-up question** if you have any doubts or need clarification
 - **DO NOT assume** on your own - ask the user to clarify when unsure
