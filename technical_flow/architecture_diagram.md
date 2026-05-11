@@ -200,23 +200,43 @@ sequenceDiagram
 ```mermaid
 erDiagram
     connections {
-        string connectionId PK "WebSocket connection ID"
-        string userId "Cognito username"
-        number connectedAt "Unix timestamp"
-        string endpoint "API Gateway endpoint"
+        string connectionId PK
+        string userId
+        number connectedAt
+        string endpoint
     }
 
     messages {
-        string conversationId PK "user-a|user-b sorted"
-        number timestamp SK "Unix timestamp"
-        string messageId "UUID primary key"
-        string senderId "Sending user ID"
-        string receiverId "Receiving user ID"
-        string message "Message content"
+        string conversationId PK
+        number timestamp SK
+        string messageId
+        string senderId
+        string receiverId
+        string message
     }
 
     connections ||--o{ messages : stores
 ```
+
+### Table Definitions
+
+**connections table**
+| Attribute | Type | Key |
+|-----------|------|-----|
+| connectionId | String | Partition Key (PK) |
+| userId | String | Attribute |
+| connectedAt | Number | Attribute |
+| endpoint | String | Attribute |
+
+**messages table**
+| Attribute | Type | Key |
+|-----------|------|-----|
+| conversationId | String | Partition Key (PK) |
+| timestamp | Number | Sort Key (SK) |
+| messageId | String | Attribute |
+| senderId | String | Attribute |
+| receiverId | String | Attribute |
+| message | String | Attribute |
 
 ## Infrastructure (Terraform-managed Resources)
 
