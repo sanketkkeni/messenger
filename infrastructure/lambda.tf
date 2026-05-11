@@ -119,7 +119,7 @@ resource "aws_lambda_function" "users_handler" {
 
   # Package the Lambda function from local directory
   filename = "${path.module}/users_handler.zip"
-  
+
   # Environment variables
   environment {
     variables = {
@@ -127,7 +127,35 @@ resource "aws_lambda_function" "users_handler" {
       LOG_LEVEL    = "INFO"
     }
   }
-  
+
+  tags = {
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+# Lambda Function: History Handler
+resource "aws_lambda_function" "history_handler" {
+  function_name = "${var.project_name}-history-handler"
+  runtime       = var.lambda_runtime
+  handler       = "history_handler.lambda_handler"
+  role          = aws_iam_role.lambda_role.arn
+  timeout       = var.lambda_timeout
+  memory_size   = var.lambda_memory_size
+
+  description   = "Retrieves chat message history from DynamoDB"
+
+  # Package the Lambda function from local directory
+  filename = "${path.module}/history_handler.zip"
+
+  # Environment variables
+  environment {
+    variables = {
+      MESSAGES_TABLE_NAME = aws_dynamodb_table.messages.name
+      LOG_LEVEL           = "INFO"
+    }
+  }
+
   tags = {
     Environment = var.environment
     Project     = var.project_name

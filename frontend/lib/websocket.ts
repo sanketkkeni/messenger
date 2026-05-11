@@ -199,7 +199,7 @@ export function isConnected(): boolean {
 /**
  * Fetch list of users from REST API
  * Used for user discovery/selection in the chat UI
- * 
+ *
  * @param accessToken - Valid access token from Cognito login
  * @returns Array of user objects with email, username, etc.
  */
@@ -218,6 +218,34 @@ export async function fetchUsers(accessToken: string): Promise<any[]> {
     const data = await response.json();
     return data.users || [];
   } catch (error) {
+    return [];
+  }
+}
+
+/**
+ * Fetch message history for a conversation from REST API
+ *
+ * @param accessToken - Valid access token from Cognito login
+ * @param conversationId - The conversation ID (format: userId1#userId2)
+ * @param limit - Maximum number of messages to fetch (default 50)
+ * @returns Array of message objects
+ */
+export async function fetchHistory(accessToken: string, conversationId: string, limit: number = 50): Promise<any[]> {
+  try {
+    const response = await fetch(`${REST_API_ENDPOINT}/conversations/${encodeURIComponent(conversationId)}/messages?limit=${limit}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch history: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.messages || [];
+  } catch (error) {
+    console.error('Error fetching message history:', error);
     return [];
   }
 }

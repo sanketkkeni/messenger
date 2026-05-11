@@ -212,6 +212,19 @@ resource "aws_apigatewayv2_route" "cors_preflight" {
   target      = "integrations/${aws_apigatewayv2_integration.users_integration.id}"
 }
 
+# History API Routes
+resource "aws_apigatewayv2_route" "history_route" {
+  api_id    = aws_apigatewayv2_api.rest_api.id
+  route_key = "GET /conversations/{conversationId}/messages"
+  target    = "integrations/${aws_apigatewayv2_integration.history_integration.id}"
+}
+
+resource "aws_apigatewayv2_route" "cors_preflight_history" {
+  api_id      = aws_apigatewayv2_api.rest_api.id
+  route_key   = "OPTIONS /conversations/{conversationId}/messages"
+  target      = "integrations/${aws_apigatewayv2_integration.history_integration.id}"
+}
+
 # REST API Integration
 resource "aws_apigatewayv2_integration" "users_integration" {
   api_id           = aws_apigatewayv2_api.rest_api.id
@@ -219,11 +232,26 @@ resource "aws_apigatewayv2_integration" "users_integration" {
   integration_uri  = aws_lambda_function.users_handler.arn
 }
 
+# History API Integration
+resource "aws_apigatewayv2_integration" "history_integration" {
+  api_id           = aws_apigatewayv2_api.rest_api.id
+  integration_type = "AWS_PROXY"
+  integration_uri  = aws_lambda_function.history_handler.arn
+}
+
 # Permissions for REST API Gateway to invoke Lambda function
 resource "aws_lambda_permission" "allow_rest_apigateway_users" {
   statement_id  = "AllowRESTAPIGatewayUsers"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.users_handler.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.rest_api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "allow_rest_apigateway_history" {
+  statement_id  = "AllowRESTAPIGatewayHistory"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.history_handler.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.rest_api.execution_arn}/*/*"
 }

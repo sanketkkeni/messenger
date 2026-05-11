@@ -19,7 +19,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import { useWebSocket } from '../context/WebSocketContext';
-import { fetchUsers } from '../lib/websocket';
+import { fetchUsers, fetchHistory } from '../lib/websocket';
 import { getStoredTokens, getStoredUserId } from '../lib/auth';
 import { MessageSquare, LogOut, Send, Users, X } from 'lucide-react';
 
@@ -66,6 +66,7 @@ export default function Chat() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [messageText, setMessageText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Redirect to login if not authenticated (but wait for auth check to complete)
@@ -93,6 +94,44 @@ export default function Chat() {
 
     loadUsers();
   }, [user, authLoading, router]);
+
+  // Load message history when a user is selected
+  useEffect(() => {
+    if (!selectedUser || !user || authLoading) return;
+
+    const loadHistory = async () => {
+      const tokens = getStoredTokens();
+      if (!tokens?.accessToken) return;
+
+      const conversationId = getConversationId(user.username, selectedUser.username);
+
+      setLoadingHistory(true);
+
+      // Fetch history from REST API
+      const history = await fetchHistory(tokens.accessToken, conversationId);
+
+      if (history.length > 0) {
+        // Convert history to Message format and add to messages state
+        const historyMessages: Message[] = history.map((msg: any) => ({
+          senderId: msg.senderId,
+          text: msg.message,
+          timestamp: msg.timestamp,
+          conversationId
+        }));
+
+        // Add history messages to state (avoid duplicates)
+        setMessages(prev => {
+          const existingIds = new Set(prev.map(m => `${m.senderId}-${m.text}-${m.timestamp}`));
+          const newMessages = historyMessages.filter(m => !existingIds.has(`${m.senderId}-${m.text}-${m.timestamp}`));
+          return [...prev, ...newMessages];
+        });
+      }
+
+      setLoadingHistory(false);
+    };
+
+    loadHistory();
+  }, [selectedUser, user, authLoading, setMessages]);
 
   /**
    * Send message to the selected user
@@ -245,7 +284,11 @@ export default function Chat() {
 
               {/* Message List */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {filteredMessages.length === 0 ? (
+                {loadingHistory ? (
+                  <div className="text-center text-gray-400 py-8">
+                    Loading message history...
+                  </div>
+                ) : filteredMessages.length === 0 ? (
                   <div className="text-center text-gray-400 py-8">
                     No messages yet. Start the conversation!
                   </div>

@@ -168,6 +168,26 @@ def get_conversation_id(user1_id, user2_id):
     sorted_ids = sorted([user1_id, user2_id])
     return f"{sorted_ids[0]}#{sorted_ids[1]}"
 
+def get_messages(conversation_id, limit=50):
+    """Retrieve messages for a conversation from DynamoDB"""
+    try:
+        if not messages_table:
+            return []
+
+        response = messages_table.query(
+            KeyConditionExpression=boto3.dynamodb.conditions.Key('conversationId').eq(conversation_id),
+            ScanIndexForward=False,  # Descending order (newest first)
+            Limit=limit
+        )
+
+        items = response.get('Items', [])
+        # Convert back to ascending order (oldest first for display)
+        items.reverse()
+        return items
+    except Exception as e:
+        print(f"Error getting messages: {str(e)}")
+        return []
+
 def send_websocket_message(connection_id, message_data, endpoint_url):
     """Send a message via WebSocket using the API Gateway Management API"""
     global apigatewaymanagementapi_client

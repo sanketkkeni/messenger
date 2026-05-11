@@ -337,6 +337,49 @@ User 2 received message: ✅ PASS
 
 ---
 
+## Feature: Chat History (Message History Loading) - 2026-05-11
+
+### Date Implemented: 2026-05-11
+
+### Problem Statement
+Users only saw real-time messages (messages sent after login). Previous conversations were lost when logging out or refreshing.
+
+### Solution
+Added REST API endpoint to retrieve message history from DynamoDB when opening a conversation.
+
+### Files Changed/Added
+
+**Backend:**
+- `backend/utils.py` - Added `get_messages()` function to query DynamoDB
+- `backend/history_handler.py` - New Lambda handler for `/conversations/{id}/messages`
+- `backend/history_handler.zip` - Lambda deployment package
+
+**Infrastructure:**
+- `infrastructure/lambda.tf` - Added `history_handler` Lambda resource
+- `infrastructure/api_gateway.tf` - Added history routes and integration
+- `infrastructure/outputs.tf` - Added `history_handler_function_name` output
+
+**Frontend:**
+- `frontend/lib/websocket.ts` - Added `fetchHistory()` function
+- `frontend/pages/chat.tsx` - Added history loading on conversation select
+
+### API Endpoint
+- **URL**: `GET /conversations/{conversationId}/messages?limit=50`
+- **Auth**: Bearer token (Cognito JWT)
+- **Response**: `{ messages: [...], conversationId: "...", count: n }`
+
+### Key Implementation Notes
+1. DynamoDB returns `Decimal` types that must be converted to `int` for JSON serialization
+2. CORS requires `multiValueHeaders` for API Gateway AWS_PROXY integration
+3. History is loaded when user selects a contact, shown as "Loading message history..."
+
+### Playwright Test
+Test file: `frontend/tests/message.test.ts`
+- Verifies both users see their messages
+- Verifies WebSocket delivery works
+
+---
+
 ## Future Enhancement
 - Load chat history from DynamoDB on conversation open
 - Backend: Add `get_messages` function in `utils.py` to query DynamoDB

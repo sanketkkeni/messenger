@@ -102,6 +102,11 @@ output "users_handler_function_name" {
   value       = aws_lambda_function.users_handler.function_name
 }
 
+output "history_handler_function_name" {
+  description = "The name of the History Handler Lambda function"
+  value       = aws_lambda_function.history_handler.function_name
+}
+
 # IAM Role Output
 output "lambda_role_arn" {
   description = "The ARN of the Lambda execution role"
