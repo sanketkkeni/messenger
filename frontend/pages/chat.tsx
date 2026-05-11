@@ -59,7 +59,7 @@ const getConversationId = (user1: string, user2: string): string => {
 export default function Chat() {
   const router = useRouter();
   const { user, signOut } = useAuth();
-  const { connected, sendMessage, messages } = useWebSocket();
+  const { connected, sendMessage, messages, setMessages } = useWebSocket();
   
   // User list state
   const [users, setUsers] = useState<User[]>([]);
@@ -99,7 +99,16 @@ export default function Chat() {
   const handleSend = () => {
     if (!messageText.trim() || !selectedUser) return;
 
-    // sendMessage sends via WebSocket with action: 'sendMessage'
+    const conversationId = getConversationId(user?.username || '', selectedUser.username);
+
+    const newMessage: Message = {
+      senderId: currentUserId || '',
+      text: messageText,
+      timestamp: Date.now(),
+      conversationId
+    };
+
+    setMessages(prev => [...prev, newMessage]);
     sendMessage(selectedUser.username, messageText);
     setMessageText('');
   };

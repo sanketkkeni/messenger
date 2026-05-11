@@ -90,4 +90,8 @@ resource "aws_cognito_user_pool_client" "family_messenger_client" {
   access_token_validity  = 1    # 1 hour
   id_token_validity      = 1    # 1 hour
   refresh_token_validity = 30   # 30 days
+
+  # OAuth callback URLs
+  callback_urls = ["${var.frontend_url}/api/auth/callback/cognito"]
+  logout_urls   = [var.frontend_url]
 }

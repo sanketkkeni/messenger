@@ -167,6 +167,27 @@ The authorizer Lambda validates tokens by decoding the JWT payload without crypt
 4. If allowed, request proceeds to connect_handler Lambda
 5. connect_handler stores connection mapping in DynamoDB
 
+**Authentication Architecture**
+
+| Route | Auth Type | Why It's Adequate |
+|-------|-----------|------------------|
+| `$connect` | CUSTOM (JWT via authorizer) | Validates user identity at connection time |
+| `sendMessage` | Connection-based | Sender validated via DynamoDB lookup (connectionId -> userId). You can't fake a connectionId since API Gateway assigns it. |
+| `$disconnect` | Connection-based | Only cleans up connections that exist. No security risk. |
+| `GET /users` | NONE | Exposes user list for contact discovery. Acceptable for family/private app. |
+| `OPTIONS /*` | NONE | Required for CORS preflight |
+
+**Why sendMessage/$disconnect don't need additional auth:**
+- The `connectionId` is assigned by API Gateway during `$connect` - it's a valid proof of identity
+- message_handler looks up the connectionId in DynamoDB to find the actual userId
+- An attacker can't forge a connectionId - they'd need a valid WebSocket connection
+- This is a standard pattern for WebSocket APIs
+
+**Adding more auth (Lambda authorizer to sendMessage) would:**
+- Require re-validating JWT on every message (performance cost)
+- Not improve security (connectionId already proves identity)
+- Add complexity for no benefit
+
 ---
 
 ---
@@ -257,6 +278,70 @@ const req = https.request(options, (res) => {
 });
 req.end();
 ```
+
+---
+
+## Feature: Show Both Users' Messages in Chat (2026-05-10)
+
+### Date Implemented: 2026-05-10
+
+### Problem Statement
+When user A sends a message, only user B could see it. User A's sent messages did not appear in their own chat view.
+
+### Root Cause
+The `handleSend` function in `frontend/pages/chat.tsx` only sent messages via WebSocket but did NOT add them to local message state. The backend correctly routes messages only to recipients (standard behavior), so sent messages never returned to the sender.
+
+### Solution
+1. Exposed `setMessages` from `WebSocketContext` (previously internal only)
+2. Modified `handleSend` to add the message to local state immediately after sending
+
+### Files Changed
+
+**frontend/context/WebSocketContext.tsx**
+- Added `setMessages` to interface and provider value
+
+**frontend/pages/chat.tsx**
+- Updated `handleSend` to add message to local state:
+```typescript
+const handleSend = () => {
+  if (!messageText.trim() || !selectedUser) return;
+
+  const conversationId = getConversationId(user?.username || '', selectedUser.username);
+
+  const newMessage: Message = {
+    senderId: currentUserId || '',
+    text: messageText,
+    timestamp: Date.now(),
+    conversationId
+  };
+
+  setMessages(prev => [...prev, newMessage]);
+  sendMessage(selectedUser.username, messageText);
+  setMessageText('');
+};
+```
+
+### Verification: Playwright Test (2026-05-10)
+Test file: `frontend/tests/message.test.ts`
+```bash
+npx playwright test tests/message.test.ts --reporter=line
+```
+
+**Test Results:**
+```
+=== FINAL RESULT ===
+User 1 sees own message: ✅ PASS
+User 2 received message: ✅ PASS
+1 passed (21.9s)
+```
+
+---
+
+## Future Enhancement
+- Load chat history from DynamoDB on conversation open
+- Backend: Add `get_messages` function in `utils.py` to query DynamoDB
+- Backend: Create `history_handler.py` Lambda or add WebSocket `getHistory` action
+- Frontend: Fetch history when conversation selected, merge with WebSocket messages
 
 ---
 

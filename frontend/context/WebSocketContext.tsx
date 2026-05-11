@@ -27,6 +27,7 @@ interface Message {
 interface WebSocketContextType {
   connected: boolean;
   messages: Message[];
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   sendMessage: (recipientId: string, text: string) => boolean;
   clearMessages: () => void;
   connectWebSocket: () => Promise<boolean>;
@@ -128,6 +129,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       value={{
         connected,
         messages,
+        setMessages,
         sendMessage: handleSendMessage,
         clearMessages,
         connectWebSocket: handleConnect,

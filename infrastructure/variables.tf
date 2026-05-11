@@ -73,3 +73,10 @@ variable "lambda_memory_size" {
   type        = number
   default     = 256
 }
+
+# Frontend/Callback URL variables
+variable "frontend_url" {
+  description = "Frontend application URL (for Cognito callback)"
+  type        = string
+  default     = "http://localhost:3000"
+}

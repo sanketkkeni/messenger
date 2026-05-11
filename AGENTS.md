@@ -1,5 +1,10 @@
 # Agent Rules - Serverless Messaging Project
 
+## General Guidelines
+- **ALWAYS ask a follow-up question** if you have any doubts or need clarification
+- **DO NOT assume** on your own - ask the user to clarify when unsure
+- When presented with multiple options or unclear requirements, ask the user to choose
+
 ## Terraform Commands
 - **NEVER run `terraform plan` on your own** - always wait for user instruction
 - **NEVER run `terraform apply` or any command that modifies state** without explicit user confirmation
@@ -30,12 +35,15 @@
   3. Deploy via AWS CLI: `aws lambda update-function-code --function-name <name> --zip-file fileb://infrastructure/<handler>.zip --no-cli-pager`
   4. Only run terraform plan/apply if there are infrastructure changes (IAM, API Gateway, etc.)
 
-## WebSocket Authentication (Important)
-- WebSocket `$connect` route uses `AuthorizationType: NONE` for simplicity
-- Connect handler extracts JWT from `queryStringParameters.Authorization`
+## WebSocket Authentication
+- WebSocket `$connect` route uses `AuthorizationType: CUSTOM` with custom authorizer
+- Authorizer identity source: `route.request.querystring.Authorization` (only - multiple sources cause 401)
+- Authorizer returns IAM policy format (not `isAuthorized: true`) for WebSocket APIs
+- Connect handler extracts userId from authorizer context OR falls back to query param
 - Token validation: decode JWT payload, extract `cognito:username` or `sub` as userId
 - Frontend sends token as query param: `?Authorization=<jwt_token>`
 - WebSocket URL must include stage: `wss://<api-id>.execute-api.<region>.amazonaws.com/$default`
+- **sendMessage/$disconnect**: Use connection-based auth (DynamoDB lookup of connectionId -> userId)
 
 ## AWS CLI Usage
 - **Read-only**: Describe resources, check logs, verify state
