@@ -200,21 +200,19 @@ sequenceDiagram
 ```mermaid
 erDiagram
     connections {
-        string connectionId PK
+        string connectionId
         string userId
         number connectedAt
         string endpoint
     }
-
     messages {
-        string conversationId PK
-        number timestamp SK
+        string conversationId
+        number timestamp
         string messageId
         string senderId
         string receiverId
         string message
     }
-
     connections ||--o{ messages : stores
 ```
 
