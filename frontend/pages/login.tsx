@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import { MessageSquare, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { resendVerificationCode } from '../lib/auth';
 
 export default function Login() {
   const router = useRouter();
@@ -10,7 +11,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<React.ReactNode>('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,7 +22,31 @@ export default function Login() {
       await signIn(email, password);
       router.push('/chat');
     } catch (err: any) {
-      setError(err.message || 'Invalid email or password');
+      const errorMessage = err?.message || err?.error?.message || String(err) || 'Invalid email or password';
+      console.log('Login error:', errorMessage);
+      const lowerError = errorMessage.toLowerCase();
+      if (lowerError.includes('not confirmed') || lowerError.includes('not verified') || lowerError.includes('email not verified')) {
+        setError(
+          <>
+            Your account is not verified. Please check your email for the verification code.{' '}
+            <button
+              onClick={async () => {
+                try {
+                  await resendVerificationCode(email);
+                } catch (e) {
+                  console.log('Resend error:', e);
+                }
+                router.push(`/confirm?email=${encodeURIComponent(email)}`);
+              }}
+              className="text-primary-400 hover:text-primary-300 underline"
+            >
+              Verify now
+            </button>
+          </>
+        );
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }

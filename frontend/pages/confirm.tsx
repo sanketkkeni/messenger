@@ -96,6 +96,9 @@ export default function Confirm() {
                 We sent a code to<br />
                 <span className="text-white font-medium">{email || 'loading...'}</span>
               </p>
+              <p className="text-gray-500 text-sm mt-3">
+                Don&apos;t forget to check your spam folder!
+              </p>
             </div>
 
             {error && (

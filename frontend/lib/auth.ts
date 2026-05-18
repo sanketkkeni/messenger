@@ -14,7 +14,7 @@
  * - userId: Cognito username (sub claim)
  */
 
-import { CognitoIdentityProviderClient, SignUpCommand, GetUserCommand, InitiateAuthCommand, GlobalSignOutCommand, ConfirmSignUpCommand } from '@aws-sdk/client-cognito-identity-provider';
+import { CognitoIdentityProviderClient, SignUpCommand, GetUserCommand, InitiateAuthCommand, GlobalSignOutCommand, ConfirmSignUpCommand, ResendConfirmationCodeCommand } from '@aws-sdk/client-cognito-identity-provider';
 
 // Configuration from environment variables (set in frontend/.env.local)
 const REGION = process.env.NEXT_PUBLIC_AWS_REGION || 'us-east-1';
@@ -75,6 +75,16 @@ export async function confirmSignUp(email: string, confirmationCode: string): Pr
     ClientId: CLIENT_ID,
     Username: email,
     ConfirmationCode: confirmationCode,
+  });
+
+  await cognitoClient.send(command);
+  return true;
+}
+
+export async function resendVerificationCode(email: string): Promise<boolean> {
+  const command = new ResendConfirmationCodeCommand({
+    ClientId: CLIENT_ID,
+    Username: email,
   });
 
   await cognitoClient.send(command);
